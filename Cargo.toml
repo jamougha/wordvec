@@ -1,0 +1,4 @@
+[package]
+name = "wordvec"
+version = "0.0.1"
+authors = ["James Moughan <jamougha@gmail.com>"]
