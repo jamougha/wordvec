@@ -1,4 +1,5 @@
 #![feature(std_misc)]
+mod models;
 
 use std::fs::{File, read_dir};
 use std::io::{BufReader, BufRead, Read, Write};
@@ -6,6 +7,7 @@ use std::path::Path;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
 use std::ascii::OwnedAsciiExt;
+use models::*;
 
 fn count_tokens<T: Read>(reader: BufReader<T>, word_counts: &mut HashMap<String, u32>) {
 
@@ -60,42 +62,6 @@ fn load_most_common_words(filename: &str) -> Vec<String> {
     ).collect()
 }
 
-struct WordVec {
-    word: String,
-    count: u32,
-    normalized: bool,
-    vec: Box<[f32; 10_000]>,
-}
-
-impl WordVec {
-    fn new(word: String) -> WordVec {
-        WordVec {
-            word: word,
-            count: 0,
-            normalized: false,
-            vec: Box::new([0f32; 10_000]),
-        }
-    }
-
-    fn normalize(&mut self) {
-        assert!(!self.normalized);
-        for elem in &mut self.vec[..] {
-            *elem /= self.count as f32;
-        }
-        self.normalized = true;
-    }
-
-    fn inc(&mut self, i: usize) {
-        self.vec[i] += 1.0;
-    }
-
-    fn distance(&self, other: &WordVec) -> f32 {
-        self.vec.iter()
-                .zip(other.vec.iter())
-                .map(|(x, y)| (x*x - y*y).sqrt())
-                .fold(0.0, |x, y| x + y)
-    }
-}
 
 fn main() {
     // find_most_common_words("/home/jamougha/corpus/pg", "/home/jamougha/corpus/pg/word_counts.csv");
