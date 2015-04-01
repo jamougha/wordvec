@@ -1,5 +1,6 @@
 use std::ops::{Add, Sub};
 use std::collections::HashMap;
+use std::iter::FromIterator;
 
 struct WordVecBuilder {
     pub word: String,
@@ -14,8 +15,8 @@ pub struct WordVec {
 }
 
 impl WordVecBuilder {
-    fn new(word: String) -> WordVec {
-        WordVec {
+    fn new(word: String) -> WordVecBuilder {
+        WordVecBuilder {
             word: word,
             count: 0,
             vec: Box::new([0f32; 10_000]),
@@ -91,13 +92,21 @@ pub struct LanguageModelBuilder {
 }
 
 impl LanguageModelBuilder {
-    fn new(words: Vec<String>) {
-        let mut builder = LanguageModelBuilder {
-            words: HashMap::new(),
-            word_vecs: Vec::new(),
+    fn new(words: Vec<String>) -> LanguageModelBuilder {
+        assert_eq!(words.len(), 10_000);
+
+        let word_vecs = words.iter()
+                              .map(|s| WordVecBuilder::new(s.clone()))
+                              .collect();
+
+        let words = HashMap::from_iter(
+                        words.into_iter()
+                             .enumerate()
+                             .map(|(a, b)| (b, a)));
+
+        LanguageModelBuilder {
+            words: words,
+            word_vecs: word_vecs,
         }
-        assert_eq!(words.len, 10_000);
-
-
     }
 }
