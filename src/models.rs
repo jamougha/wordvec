@@ -1,6 +1,7 @@
 use std::ops::{Add, Sub};
 use std::collections::HashMap;
 use std::iter::FromIterator;
+use std::collections::VecDeque;
 
 struct WordVecBuilder {
     pub word: String,
@@ -86,18 +87,29 @@ impl<'a> Sub for &'a WordVec {
     }
 }
 
+pub struct LanguageModel {
+    words: HashMap<String, usize>,
+    word_vecs: Vec<WordVec>,
+}
+
 pub struct LanguageModelBuilder {
     words: HashMap<String, usize>,
     word_vecs: Vec<WordVecBuilder>,
 }
 
-impl LanguageModelBuilder {
+pub struct WordAcceptor<'a> {
+    window: VecDeque<String>,
+    focus: usize,
+    builder: &'a mut LanguageModelBuilder,
+}
+
+impl<'a> LanguageModelBuilder {
     fn new(words: Vec<String>) -> LanguageModelBuilder {
         assert_eq!(words.len(), 10_000);
 
         let word_vecs = words.iter()
-                              .map(|s| WordVecBuilder::new(s.clone()))
-                              .collect();
+                             .map(|s| WordVecBuilder::new(s.clone()))
+                             .collect();
 
         let words = HashMap::from_iter(
                         words.into_iter()
@@ -107,6 +119,34 @@ impl LanguageModelBuilder {
         LanguageModelBuilder {
             words: words,
             word_vecs: word_vecs,
+        }
+    }
+
+    fn build(self) -> LanguageModel {
+        LanguageModel {
+            words: self.words,
+            word_vecs: self.word_vecs.into_iter()
+                                     .map(|b| b.normalize())
+                                     .collect(),
+        }
+    }
+
+    fn newFile(&'a mut self) -> WordAcceptor<'a> {
+        WordAcceptor {
+            window: VecDeque::new(),
+            focus: 0,
+            builder: self,
+        }
+    }
+}
+
+impl<'a> WordAcceptor<'a> {
+    fn word(&mut self, word: String) {
+        if let Some(idx) = self.builder.words.get(&word) {
+            self.window.push_back(word);
+            if (self.window.len() > 21) {
+                self.window.pop_front();
+            }
         }
     }
 }
