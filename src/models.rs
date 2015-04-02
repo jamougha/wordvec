@@ -107,7 +107,7 @@ pub struct WordAcceptor<'a> {
 }
 
 impl<'a> LanguageModelBuilder {
-    fn new(words: Vec<String>) -> LanguageModelBuilder {
+    pub fn new(words: Vec<String>) -> LanguageModelBuilder {
         assert_eq!(words.len(), 10_000);
 
         let word_vecs = words.iter()
@@ -126,7 +126,7 @@ impl<'a> LanguageModelBuilder {
         }
     }
 
-    fn build(self) -> LanguageModel {
+    pub fn build(self) -> LanguageModel {
         let total_words = self.word_vecs.iter().fold(0.0, |a, b| a + b.count as f32);
         let word_freqs = self.word_vecs.iter()
                                        .map(|v| v.count as f32 / total_words)
@@ -139,7 +139,7 @@ impl<'a> LanguageModelBuilder {
         }
     }
 
-    fn new_file(&'a mut self) -> WordAcceptor<'a> {
+    pub fn new_file(&'a mut self) -> WordAcceptor<'a> {
         WordAcceptor {
             window: VecDeque::new(),
             focus: 0,
@@ -155,7 +155,7 @@ impl<'a> LanguageModelBuilder {
 }
 
 impl<'a> WordAcceptor<'a> {
-    fn word(&mut self, word: String) {
+    fn add_word(&mut self, word: String) {
         let idx = self.builder.words.get(&word).map(|i| *i);
 
         if let Some(idx) = idx {
