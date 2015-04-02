@@ -129,7 +129,7 @@ impl<'a> LanguageModelBuilder {
     fn build(self) -> LanguageModel {
         let total_words = self.word_vecs.iter().fold(0.0, |a, b| a + b.count as f32);
         let word_freqs = self.word_vecs.iter()
-                                       .map(|v| v.count as f32 / total_words as f32)
+                                       .map(|v| v.count as f32 / total_words)
                                        .collect::<Vec<_>>();
         LanguageModel {
             words: self.words,
