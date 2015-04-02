@@ -2,6 +2,7 @@ use std::ops::{Add, Sub};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::collections::VecDeque;
+use std::cmp::Ordering::Equal;
 
 struct WordVecBuilder {
     pub word: String,
@@ -155,10 +156,10 @@ impl<'a> LanguageModelBuilder {
 }
 
 impl<'a> WordAcceptor<'a> {
-    fn add_word(&mut self, word: String) {
-        let idx = self.builder.words.get(&word).map(|i| *i);
+    pub fn add_word(&mut self, word: String) {
+        let allow_word = self.builder.words.contains_key(&word);
 
-        if let Some(idx) = idx {
+        if allow_word {
             self.window.push_back(word);
             if (self.window.len() > 21) {
                 self.window.pop_front();
@@ -169,5 +170,21 @@ impl<'a> WordAcceptor<'a> {
                 }
             }
         }
+    }
+}
+
+impl LanguageModel {
+    pub fn get(&self, word: &str) -> Option<&WordVec> {
+        if let Some(i) = self.words.get(word) {
+            Some(&self.word_vecs[*i])
+        } else {
+            None
+        }
+    }
+
+    pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
+        let mut vec_refs = self.word_vecs.iter().map(|v| v).collect::<Vec<_>>();
+        vec_refs.sort_by(|a, b| a.distance(word).partial_cmp(&b.distance(word)).unwrap_or(Equal));
+        vec_refs
     }
 }
