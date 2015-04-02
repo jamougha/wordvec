@@ -24,10 +24,12 @@ impl WordVecBuilder {
         }
     }
 
-    fn normalize(mut self) -> WordVec {
-        for elem in &mut self.vec[..] {
-            *elem /= self.count as f32;
+    fn normalize(mut self, word_freqs: &Vec<f32>) -> WordVec {
+        let count = self.count as f32;
+        for i in 0..word_freqs.len() {
+            self.vec[i] = self.vec[i] / count /  word_freqs[i];
         }
+
         WordVec {
             word: self.word,
             count: self.count,
@@ -123,10 +125,14 @@ impl<'a> LanguageModelBuilder {
     }
 
     fn build(self) -> LanguageModel {
+        let total_words = self.word_vecs.iter().fold(0.0, |a, b| a + b.count as f32);
+        let word_freqs = self.word_vecs.iter()
+                                       .map(|v| v.count as f32 / total_words as f32)
+                                       .collect::<Vec<_>>();
         LanguageModel {
             words: self.words,
             word_vecs: self.word_vecs.into_iter()
-                                     .map(|b| b.normalize())
+                                     .map(|b| b.normalize(&word_freqs))
                                      .collect(),
         }
     }
