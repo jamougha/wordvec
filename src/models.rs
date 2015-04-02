@@ -183,7 +183,7 @@ impl LanguageModel {
     }
 
     pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
-        let mut vec_refs = self.word_vecs.iter().map(|v| v).collect::<Vec<_>>();
+        let mut vec_refs = self.word_vecs.iter().collect::<Vec<_>>();
         vec_refs.sort_by(|a, b| a.distance(word).partial_cmp(&b.distance(word)).unwrap_or(Equal));
         vec_refs
     }
