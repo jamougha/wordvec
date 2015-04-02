@@ -95,6 +95,7 @@ pub struct LanguageModel {
 }
 
 pub struct LanguageModelBuilder {
+    window_width: u32,
     words: HashMap<String, usize>,
     word_vecs: Vec<WordVecBuilder>,
 }
@@ -119,6 +120,7 @@ impl<'a> LanguageModelBuilder {
                              .map(|(a, b)| (b, a)));
 
         LanguageModelBuilder {
+            window_width: 21,
             words: words,
             word_vecs: word_vecs,
         }
@@ -137,21 +139,34 @@ impl<'a> LanguageModelBuilder {
         }
     }
 
-    fn newFile(&'a mut self) -> WordAcceptor<'a> {
+    fn new_file(&'a mut self) -> WordAcceptor<'a> {
         WordAcceptor {
             window: VecDeque::new(),
             focus: 0,
             builder: self,
         }
     }
+
+    fn add_word(&mut self, word: &str) {
+        let idx = self.words[word];
+        let word_vec = &mut self.word_vecs[idx];
+        word_vec.inc(idx);
+    }
 }
 
 impl<'a> WordAcceptor<'a> {
     fn word(&mut self, word: String) {
-        if let Some(idx) = self.builder.words.get(&word) {
+        let idx = self.builder.words.get(&word).map(|i| *i);
+
+        if let Some(idx) = idx {
             self.window.push_back(word);
             if (self.window.len() > 21) {
                 self.window.pop_front();
+            }
+            if (self.window.len() == 21) {
+                for i in (0..21).filter(|a| *a != 10) {
+                    self.builder.add_word(&self.window[i]);
+                }
             }
         }
     }
