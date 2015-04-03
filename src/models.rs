@@ -38,7 +38,7 @@ impl WordVecBuilder {
     fn normalize(mut self, word_freqs: &Vec<f32>) -> WordVec {
         let count = self.count as f32;
         for i in 0..word_freqs.len() {
-            self.vec[i] = self.vec[i] / count /  word_freqs[i];
+            self.vec[i] = self.vec[i] / count;
         }
 
         WordVec {
@@ -160,10 +160,11 @@ impl<'a> LanguageModelBuilder {
         }
     }
 
-    fn add_word(&mut self, word: &str) {
-        let idx = self.words[word];
-        let word_vec = &mut self.word_vecs[idx];
-        word_vec.inc(idx);
+    fn add_word(&mut self, from: &str, to: &str) {
+        let from_idx = self.words[from];
+        let from_vec = &mut self.word_vecs[from_idx];
+        let to_idx = self.words[to];
+        from_vec.inc(to_idx);
     }
 }
 
@@ -178,7 +179,7 @@ impl<'a> WordAcceptor<'a> {
             }
             if (self.window.len() == 21) {
                 for i in (0..21).filter(|a| *a != 10) {
-                    self.builder.add_word(&self.window[i]);
+                    self.builder.add_word(&self.window[10], &self.window[i]);
                 }
             }
         }
@@ -195,8 +196,10 @@ impl LanguageModel {
     }
 
     pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
-        let mut vec_refs = self.word_vecs.iter().collect::<Vec<_>>();
-        vec_refs.sort_by(|a, b| a.distance(word).partial_cmp(&b.distance(word)).unwrap_or(Equal));
-        vec_refs
+        let mut vec_refs = self.word_vecs.iter().filter_map(|w|
+            if w.word != word.word { Some((w.distance(word), w)) } else { None }
+        ).collect::<Vec<_>>();
+        vec_refs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Equal));
+        vec_refs.into_iter().map(|x| x.1).collect()
     }
 }
