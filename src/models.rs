@@ -50,7 +50,6 @@ impl WordVecBuilder {
 
     fn inc(&mut self, i: usize) {
         self.vec[i] += 1.0;
-        self.count += 1;
     }
 }
 
@@ -160,11 +159,19 @@ impl<'a> LanguageModelBuilder {
         }
     }
 
+    fn get_vec(&mut self, word: &str) -> &mut WordVecBuilder {
+        let i = self.words[word];
+        &mut self.word_vecs[i]
+    }
+
     fn add_word(&mut self, from: &str, to: &str) {
-        let from_idx = self.words[from];
-        let from_vec = &mut self.word_vecs[from_idx];
         let to_idx = self.words[to];
+        let from_vec = self.get_vec(from);
         from_vec.inc(to_idx);
+    }
+
+    fn word_seen(&mut self, word: &str) {
+        self.get_vec(word).count += 1;
     }
 }
 
@@ -178,6 +185,7 @@ impl<'a> WordAcceptor<'a> {
                 self.window.pop_front();
             }
             if (self.window.len() == 21) {
+                self.builder.word_seen(&self.window[10]);
                 for i in (0..21).filter(|a| *a != 10) {
                     self.builder.add_word(&self.window[10], &self.window[i]);
                 }
