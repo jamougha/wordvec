@@ -3,25 +3,26 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::collections::VecDeque;
 use std::cmp::Ordering::Equal;
+use std::iter::repeat;
 
 struct WordVecBuilder {
     pub word: String,
     pub count: u64,
-    vec: Box<[f32; 10_000]>,
+    vec: Vec<f32>,
 }
 
 pub struct WordVec {
     pub word: String,
     pub count: u64,
-    vec: Box<[f32; 10_000]>,
+    vec: Vec<f32>,
 }
 
 impl WordVecBuilder {
-    fn new(word: String) -> WordVecBuilder {
+    fn new(word: String, num_words: usize) -> WordVecBuilder {
         WordVecBuilder {
             word: word,
             count: 0,
-            vec: Box::new([0f32; 10_000]),
+            vec: repeat(0.0).take(num_words).collect(),
         }
     }
 
@@ -58,10 +59,11 @@ impl<'a> Add for &'a WordVec {
     type Output = WordVec;
 
     fn add(self, other: &WordVec) -> WordVec {
+        debug_assert!(self.vec.len() == other.vec.len());
         let mut newvec = WordVec {
             word: format!("{} + {}", &self.word, &other.word),
             count: 0,
-            vec: Box::new([0f32; 10_000]),
+            vec: repeat(0.0).take(self.vec.len()).collect(),
         };
 
         for i in 0..10_000 {
@@ -76,10 +78,11 @@ impl<'a> Sub for &'a WordVec {
     type Output = WordVec;
 
     fn sub(self, other: &WordVec) -> WordVec {
+        debug_assert!(self.vec.len() == other.vec.len());
         let mut newvec = WordVec {
             word: format!("{} + {}", &self.word, &other.word),
             count: 0,
-            vec: Box::new([0f32; 10_000]),
+            vec: repeat(0.0).take(self.vec.len()).collect(),
         };
 
         for i in 0..10_000 {
@@ -102,17 +105,16 @@ pub struct LanguageModelBuilder {
 }
 
 pub struct WordAcceptor<'a> {
-    window: VecDeque<String>,
+    window: VecDeque<&'a str>,
     focus: usize,
     builder: &'a mut LanguageModelBuilder,
 }
 
 impl<'a> LanguageModelBuilder {
     pub fn new(words: Vec<String>) -> LanguageModelBuilder {
-        assert_eq!(words.len(), 10_000);
 
         let word_vecs = words.iter()
-                             .map(|s| WordVecBuilder::new(s.clone()))
+                             .map(|s| WordVecBuilder::new(s.clone(), words.len()))
                              .collect();
 
         let words = HashMap::from_iter(
@@ -156,8 +158,8 @@ impl<'a> LanguageModelBuilder {
 }
 
 impl<'a> WordAcceptor<'a> {
-    pub fn add_word(&mut self, word: String) {
-        let allow_word = self.builder.words.contains_key(&word);
+    pub fn add_word(&mut self, word: &'a str) {
+        let allow_word = self.builder.words.contains_key(word);
 
         if allow_word {
             self.window.push_back(word);
@@ -166,7 +168,7 @@ impl<'a> WordAcceptor<'a> {
             }
             if (self.window.len() == 21) {
                 for i in (0..21).filter(|a| *a != 10) {
-                    self.builder.add_word(&self.window[i]);
+                    self.builder.add_word(self.window[i]);
                 }
             }
         }
