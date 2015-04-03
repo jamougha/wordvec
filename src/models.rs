@@ -20,9 +20,7 @@ pub struct WordVec {
 
 impl Debug for WordVec {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
-        try!(self.word.fmt(fmt));
-        try!(": ".fmt(fmt));
-        self.count.fmt(fmt)
+        (&self.word, self.count).fmt(fmt)
     }
 }
 
@@ -72,7 +70,7 @@ impl<'a> Add for &'a WordVec {
         let mut newvec = WordVec {
             word: format!("{} + {}", &self.word, &other.word),
             count: 0,
-            vec: repeat(0.0).take(self.vec.len()).collect(),
+            vec: self.vec.iter().map(|_| 0.0).collect(),
         };
 
         for i in 0..10_000 {
@@ -108,14 +106,13 @@ pub struct LanguageModel {
 }
 
 pub struct LanguageModelBuilder {
-    window_width: u32,
+    window_width: usize,
     words: HashMap<String, usize>,
     word_vecs: Vec<WordVecBuilder>,
 }
 
 pub struct WordAcceptor<'a> {
     window: VecDeque<String>,
-    focus: usize,
     builder: &'a mut LanguageModelBuilder,
 }
 
@@ -154,7 +151,6 @@ impl<'a> LanguageModelBuilder {
     pub fn new_file(&'a mut self) -> WordAcceptor<'a> {
         WordAcceptor {
             window: VecDeque::new(),
-            focus: 0,
             builder: self,
         }
     }
@@ -180,14 +176,15 @@ impl<'a> WordAcceptor<'a> {
         let allow_word = self.builder.words.contains_key(&word);
 
         if allow_word {
+            let window_width = self.builder.window_width;
             self.window.push_back(word);
-            if (self.window.len() > 21) {
+            if self.window.len() > window_width {
                 self.window.pop_front();
             }
-            if (self.window.len() == 21) {
-                self.builder.word_seen(&self.window[10]);
-                for i in (0..21).filter(|a| *a != 10) {
-                    self.builder.add_word(&self.window[10], &self.window[i]);
+            if self.window.len() == window_width {
+                self.builder.word_seen(&self.window[window_width / 2]);
+                for i in (0..21).filter(|a| *a != window_width / 2) {
+                    self.builder.add_word(&self.window[window_width / 2], &self.window[i]);
                 }
             }
         }

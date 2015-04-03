@@ -2,8 +2,8 @@
 mod models;
 
 use std::fs::{File, read_dir};
-use std::io::{BufReader, BufRead, Read, Write, stdout, copy};
-use std::path::{Path, PathBuf};
+use std::io::{BufReader, BufRead, Read, Write};
+use std::path::{Path};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
 use std::ascii::OwnedAsciiExt;
@@ -64,12 +64,13 @@ fn visit_files<F: FnMut(BufReader<File>) -> ()>(path: &Path, mut file_processor:
 }
 
 fn main() {
-    const corpus_dir: &'static str = "/home/jamougha/corpus";
-    //find_most_common_words(corpus_dir, "/home/jamougha/corpus/word_counts.csv");
-    let words = load_most_common_words("/home/jamougha/corpus/word_counts.csv");
+    const CORPUS_DIR: &'static str = "/home/jamougha/corpus";
+    const WORDS: &'static str = "/home/jamougha/corpus/word_counts.csv";
+    find_most_common_words(CORPUS_DIR, WORDS);
+    let words = load_most_common_words(WORDS);
     let mut builder = LanguageModelBuilder::new(words);
 
-    let path = Path::new(corpus_dir);
+    let path = Path::new(CORPUS_DIR);
 
     visit_files(&path, |read| {
         let mut acc = (&mut builder).new_file();
@@ -78,6 +79,6 @@ fn main() {
 
     let model = builder.build();
 
-    println!("{:?}", model.nearest_words(model.get("ubuntu").unwrap()));
+    println!("{:?}", &model.nearest_words(model.get("trampoline").unwrap())[..20]);
 
 }
