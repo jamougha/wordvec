@@ -39,8 +39,6 @@ fn find_most_common_words(corpus_loc: &str, outfile: &str) {
         out.write_all(format!("{}, {}\n", word, count).as_bytes()).unwrap();
     }
 
-    println!("{:?}", &counts[0..20]);
-    println!("{:?}", &counts[counts.len() - 20..counts.len()]);
 }
 
 fn load_most_common_words(filename: &str) -> Vec<String> {
@@ -66,7 +64,7 @@ fn visit_files<F: FnMut(BufReader<File>) -> ()>(path: &Path, mut file_processor:
 fn main() {
     const CORPUS_DIR: &'static str = "/home/jamougha/corpus";
     const WORDS: &'static str = "/home/jamougha/corpus/word_counts.csv";
-    find_most_common_words(CORPUS_DIR, WORDS);
+    //find_most_common_words(CORPUS_DIR, WORDS);
     let words = load_most_common_words(WORDS);
     let mut builder = LanguageModelBuilder::new(words);
 
@@ -79,6 +77,6 @@ fn main() {
 
     let model = builder.build();
 
-    println!("{:?}", &model.nearest_words(model.get("trampoline").unwrap())[..20]);
+    println!("{:?}", &model.nearest_words(model.get("linux").unwrap())[0..20]);
 
 }
