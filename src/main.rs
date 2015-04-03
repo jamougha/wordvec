@@ -9,7 +9,7 @@ use std::collections::hash_map::Entry::*;
 use std::ascii::OwnedAsciiExt;
 use models::*;
 
-fn count_tokens<T: Read, F: FnMut(String) -> ()>(reader: BufReader<T>, counter: &mut F) {
+fn visit_tokens<T: Read, F: FnMut(String) -> ()>(reader: BufReader<T>, mut counter: F) {
     for line in reader.lines() {
     	if let Ok(line) = line {
 	    	for word in line.split(|c: char| !c.is_alphabetic()) {
@@ -25,7 +25,7 @@ fn count_tokens<T: Read, F: FnMut(String) -> ()>(reader: BufReader<T>, counter: 
 fn find_most_common_words(corpus_loc: &str, outfile: &str) {
     let path = Path::new(corpus_loc);
     let mut word_counts = HashMap::new();
-    iterate_dir(path, &mut |read| count_tokens(read, &mut |s|
+    visit_files(path, &mut |read| visit_tokens(read, &mut |s|
         match (&mut word_counts).entry(s) {
             Vacant(e) => { e.insert(1); },
             Occupied(mut e) => { *e.get_mut() += 1; },
@@ -51,7 +51,7 @@ fn load_most_common_words(filename: &str) -> Vec<String> {
     ).collect()
 }
 
-fn iterate_dir<F: FnMut(BufReader<File>) -> ()>(path: &Path, file_processor: &mut F) {
+fn visit_files<F: FnMut(BufReader<File>) -> ()>(path: &Path, mut file_processor: F) {
     let files = read_dir(path);
     for file in files.unwrap() {
         let path = file.unwrap().path();
@@ -67,26 +67,17 @@ fn main() {
     const corpus_dir: &'static str = "/home/jamougha/corpus";
     //find_most_common_words(corpus_dir, "/home/jamougha/corpus/word_counts.csv");
     let words = load_most_common_words("/home/jamougha/corpus/word_counts.csv");
-    println!("{:?}", words);
     let mut builder = LanguageModelBuilder::new(words);
 
     let path = Path::new(corpus_dir);
-    // let files = read_dir(path).unwrap()
-    //                 .map(|p| p.unwrap().path());
-                    //.filter(|p| p.extension().map(|s| s == "txt").unwrap_or(false));
-    iterate_dir(&path, &mut |read| {
-        let mut acc = builder.new_file();
-        count_tokens(read, &mut |w| acc.add_word(w));
+
+    visit_files(&path, |read| {
+        let mut acc = (&mut builder).new_file();
+        visit_tokens(read, |w| (&mut acc).add_word(w));
     });
 
     let model = builder.build();
 
-    println!("{:?}", model.nearest_words(model.get("reflect").unwrap()));
-
-    // let file = File::open(&Path::new(filename)).unwrap();
-    // let reader = BufReader::new(file);
-    // count_tokens(reader, |s| builder)
-    // count_tokens
-
+    println!("{:?}", model.nearest_words(model.get("ubuntu").unwrap()));
 
 }
