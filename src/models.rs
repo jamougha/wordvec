@@ -4,6 +4,7 @@ use std::iter::FromIterator;
 use std::collections::VecDeque;
 use std::cmp::Ordering::Equal;
 use std::iter::repeat;
+use std::fmt::{Debug, Formatter, Error};
 
 struct WordVecBuilder {
     pub word: String,
@@ -15,6 +16,14 @@ pub struct WordVec {
     pub word: String,
     pub count: u64,
     vec: Vec<f32>,
+}
+
+impl Debug for WordVec {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        try!(self.word.fmt(fmt));
+        try!(": ".fmt(fmt));
+        self.count.fmt(fmt)
+    }
 }
 
 impl WordVecBuilder {
@@ -41,6 +50,7 @@ impl WordVecBuilder {
 
     fn inc(&mut self, i: usize) {
         self.vec[i] += 1.0;
+        self.count += 1;
     }
 }
 
@@ -105,7 +115,7 @@ pub struct LanguageModelBuilder {
 }
 
 pub struct WordAcceptor<'a> {
-    window: VecDeque<&'a str>,
+    window: VecDeque<String>,
     focus: usize,
     builder: &'a mut LanguageModelBuilder,
 }
@@ -158,8 +168,8 @@ impl<'a> LanguageModelBuilder {
 }
 
 impl<'a> WordAcceptor<'a> {
-    pub fn add_word(&mut self, word: &'a str) {
-        let allow_word = self.builder.words.contains_key(word);
+    pub fn add_word(&mut self, word: String) {
+        let allow_word = self.builder.words.contains_key(&word);
 
         if allow_word {
             self.window.push_back(word);
@@ -168,7 +178,7 @@ impl<'a> WordAcceptor<'a> {
             }
             if (self.window.len() == 21) {
                 for i in (0..21).filter(|a| *a != 10) {
-                    self.builder.add_word(self.window[i]);
+                    self.builder.add_word(&self.window[i]);
                 }
             }
         }
