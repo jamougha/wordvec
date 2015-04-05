@@ -6,12 +6,6 @@ use std::cmp::Ordering::Equal;
 use std::iter::repeat;
 use std::fmt::{Debug, Formatter, Error};
 
-struct WordVecBuilder {
-    pub word: String,
-    pub count: u64,
-    vec: Vec<f32>,
-}
-
 pub struct WordVec {
     pub word: String,
     pub count: u64,
@@ -26,33 +20,6 @@ impl Debug for WordVec {
     }
 }
 
-impl WordVecBuilder {
-    fn new(word: String, num_words: usize) -> WordVecBuilder {
-        WordVecBuilder {
-            word: word,
-            count: 0,
-            vec: repeat(0.0).take(num_words).collect(),
-        }
-    }
-
-    fn normalize(mut self, word_freqs: &Vec<f32>) -> WordVec {
-        let count = self.count as f32;
-        for i in 0..word_freqs.len() {
-            self.vec[i] = self.vec[i] / count;
-        }
-
-        WordVec {
-            word: self.word,
-            count: self.count,
-            vec: self.vec,
-        }
-    }
-
-    fn inc(&mut self, i: usize) {
-        self.vec[i] += 1.0;
-    }
-}
-
 impl WordVec {
 
     pub fn distance(&self, other: &WordVec) -> f32 {
@@ -60,6 +27,25 @@ impl WordVec {
                 .zip(other.vec.iter())
                 .map(|(x, y)| (x*x - y*y).abs().sqrt())
                 .fold(0.0, |x, y| x + y)
+    }
+
+    fn new(word: String, num_words: usize) -> WordVec {
+        WordVec {
+            word: word,
+            count: 0,
+            vec: repeat(0.0).take(num_words).collect(),
+        }
+    }
+
+    fn normalize(&mut self, word_freqs: &Vec<f32>) {
+        let count = self.count as f32;
+        for i in 0..word_freqs.len() {
+            self.vec[i] = self.vec[i] / count;
+        }
+    }
+
+    fn inc(&mut self, i: usize) {
+        self.vec[i] += 1.0;
     }
 
 }
@@ -110,12 +96,11 @@ pub struct LanguageModel {
 pub struct LanguageModelBuilder {
     window_width: u32,
     words: HashMap<String, usize>,
-    word_vecs: Vec<WordVecBuilder>,
+    word_vecs: Vec<WordVec>,
 }
 
 pub struct WordAcceptor<'a> {
     window: VecDeque<String>,
-    focus: usize,
     builder: &'a mut LanguageModelBuilder,
 }
 
@@ -123,7 +108,7 @@ impl<'a> LanguageModelBuilder {
     pub fn new(words: Vec<String>) -> LanguageModelBuilder {
 
         let word_vecs = words.iter()
-                             .map(|s| WordVecBuilder::new(s.clone(), words.len()))
+                             .map(|s| WordVec::new(s.clone(), words.len()))
                              .collect();
 
         let words = HashMap::from_iter(
@@ -138,28 +123,29 @@ impl<'a> LanguageModelBuilder {
         }
     }
 
-    pub fn build(self) -> LanguageModel {
+    pub fn build(mut self) -> LanguageModel {
         let total_words = self.word_vecs.iter().fold(0.0, |a, b| a + b.count as f32);
         let word_freqs = self.word_vecs.iter()
                                        .map(|v| v.count as f32 / total_words)
                                        .collect::<Vec<_>>();
+        for vec in self.word_vecs.iter_mut() {
+            vec.normalize(&word_freqs);
+        }
+
         LanguageModel {
             words: self.words,
-            word_vecs: self.word_vecs.into_iter()
-                                     .map(|b| b.normalize(&word_freqs))
-                                     .collect(),
+            word_vecs: self.word_vecs,
         }
     }
 
     pub fn new_file(&'a mut self) -> WordAcceptor<'a> {
         WordAcceptor {
             window: VecDeque::new(),
-            focus: 0,
             builder: self,
         }
     }
 
-    fn get_vec(&mut self, word: &str) -> &mut WordVecBuilder {
+    fn get_vec(&mut self, word: &str) -> &mut WordVec {
         let i = self.words[word];
         &mut self.word_vecs[i]
     }
@@ -181,10 +167,10 @@ impl<'a> WordAcceptor<'a> {
 
         if allow_word {
             self.window.push_back(word);
-            if (self.window.len() > 21) {
+            if self.window.len() > 21 {
                 self.window.pop_front();
             }
-            if (self.window.len() == 21) {
+            if self.window.len() == 21 {
                 self.builder.word_seen(&self.window[10]);
                 for i in (0..21).filter(|a| *a != 10) {
                     self.builder.add_word(&self.window[10], &self.window[i]);
