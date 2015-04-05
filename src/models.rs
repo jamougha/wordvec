@@ -94,7 +94,7 @@ pub struct LanguageModel {
 }
 
 pub struct LanguageModelBuilder {
-    window_width: u32,
+    window_width: usize,
     words: HashMap<String, usize>,
     word_vecs: Vec<WordVec>,
 }
@@ -164,16 +164,16 @@ impl<'a> LanguageModelBuilder {
 impl<'a> WordAcceptor<'a> {
     pub fn add_word(&mut self, word: String) {
         let allow_word = self.builder.words.contains_key(&word);
-
+        let ww = self.builder.window_width;
         if allow_word {
             self.window.push_back(word);
-            if self.window.len() > 21 {
+            if self.window.len() > ww {
                 self.window.pop_front();
             }
-            if self.window.len() == 21 {
-                self.builder.word_seen(&self.window[10]);
-                for i in (0..21).filter(|a| *a != 10) {
-                    self.builder.add_word(&self.window[10], &self.window[i]);
+            if self.window.len() == ww {
+                self.builder.word_seen(&self.window[ww / 2]);
+                for i in (0..ww).filter(|a| *a != (ww / 2)) {
+                    self.builder.add_word(&self.window[ww / 2], &self.window[i]);
                 }
             }
         }
