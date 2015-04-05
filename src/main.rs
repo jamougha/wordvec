@@ -1,5 +1,6 @@
 #![feature(std_misc)]
 mod models;
+mod parser;
 
 use std::fs::{File, read_dir};
 use std::io::{BufReader, BufRead, Read, Write};

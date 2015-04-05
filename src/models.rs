@@ -163,8 +163,9 @@ impl<'a> LanguageModelBuilder {
 
 impl<'a> WordAcceptor<'a> {
     pub fn add_word(&mut self, word: String) {
-        let allow_word = self.builder.words.contains_key(&word);
         let ww = self.builder.window_width;
+        let allow_word = self.builder.words.contains_key(&word);
+
         if allow_word {
             self.window.push_back(word);
             if self.window.len() > ww {
