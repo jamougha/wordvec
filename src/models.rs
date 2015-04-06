@@ -51,7 +51,7 @@ impl WordVec {
 
 }
 
-impl<'a> Add for &'a WordVec {
+impl<'a> Add<&'a WordVec> for WordVec {
     type Output = WordVec;
 
     fn add(self, other: &WordVec) -> WordVec {
@@ -59,18 +59,18 @@ impl<'a> Add for &'a WordVec {
         let mut newvec = WordVec {
             word: format!("{} + {}", &self.word, &other.word),
             count: 0,
-            vec: repeat(0.0).take(self.vec.len()).collect(),
+            vec: self.vec,
         };
 
-        for i in 0..10_000 {
-            newvec.vec[i] = self.vec[i] + other.vec[i];
+        for i in 0..newvec.vec.len() {
+            newvec.vec[i] += other.vec[i];
         }
 
         newvec
     }
 }
 
-impl<'a> Sub for &'a WordVec {
+impl<'a> Sub<&'a WordVec> for WordVec {
     type Output = WordVec;
 
     fn sub(self, other: &WordVec) -> WordVec {
@@ -78,11 +78,11 @@ impl<'a> Sub for &'a WordVec {
         let mut newvec = WordVec {
             word: format!("{} + {}", &self.word, &other.word),
             count: 0,
-            vec: repeat(0.0).take(self.vec.len()).collect(),
+            vec: self.vec,
         };
 
         for i in 0..10_000 {
-            newvec.vec[i] = self.vec[i] - other.vec[i];
+            newvec.vec[i] -= other.vec[i];
         }
 
         newvec
