@@ -6,6 +6,7 @@ use std::cmp::Ordering::Equal;
 use std::iter::repeat;
 use std::fmt::{Debug, Formatter, Error};
 
+#[derive(Clone)]
 pub struct WordVec {
     pub word: String,
     pub count: u64,
