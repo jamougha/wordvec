@@ -1,6 +1,7 @@
 #![feature(std_misc)]
 mod models;
 mod parser;
+mod mayberef;
 
 use std::fs::{File, read_dir};
 use std::io::{BufReader, BufRead, Read, Write};
@@ -78,6 +79,10 @@ fn main() {
 
     let model = builder.build();
 
-    println!("{:?}", &model.nearest_words(model.get("king").unwrap())[0..20]);
+    let linux = model.get("king").unwrap();
+    let nearest = model.nearest_words(linux);
+    for word in nearest.iter().take(20) {
+        println!("{:?}, {}", word, linux.distance(word));
+    }
 
 }

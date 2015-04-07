@@ -16,7 +16,7 @@ pub struct WordVec {
 impl Debug for WordVec {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         try!(self.word.fmt(fmt));
-        try!(": ".fmt(fmt));
+        try!(fmt.write_str(": "));
         self.count.fmt(fmt)
     }
 }
@@ -41,7 +41,7 @@ impl WordVec {
     fn normalize(&mut self, word_freqs: &Vec<f32>) {
         let count = self.count as f32;
         for i in 0..word_freqs.len() {
-            self.vec[i] = self.vec[i] / count;
+            self.vec[i] = self.vec[i] / count / word_freqs[i];
         }
     }
 
@@ -127,7 +127,7 @@ impl<'a> LanguageModelBuilder {
     pub fn build(mut self) -> LanguageModel {
         let total_words = self.word_vecs.iter().fold(0.0, |a, b| a + b.count as f32);
         let word_freqs = self.word_vecs.iter()
-                                       .map(|v| v.count as f32 / total_words)
+                                       .map(|v| (v.count as f32 / total_words).max(1.0/total_words))
                                        .collect::<Vec<_>>();
         for vec in self.word_vecs.iter_mut() {
             vec.normalize(&word_freqs);
