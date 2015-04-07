@@ -2,8 +2,8 @@ use super::models::{LanguageModel, WordVec};
 use self::Token::*;
 use super::mayberef::MaybeRef::{self, Val, Ref};
 
-pub fn parse(expr: &str, model: &LanguageModel) -> WordVec {
-    expression(&mut Tokens::from(expr.chars()), model).take()
+pub fn parse(expr: &str, model: &LanguageModel) -> Result<WordVec, String> {
+    expression(&mut Tokens::from(expr.chars()), model).map(|w| w.take())
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -13,42 +13,49 @@ enum Token {
     Plus,
     Minus,
     Word(String),
+    Invalid(String),
 }
 
-fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel) -> MaybeRef<'a, WordVec>
+fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
+    -> Result<MaybeRef<'a, WordVec>, String>
     where I: Iterator<Item = char>
 {
-    let token = tokens.next().expect("An expression may not be empty");
+    let token = try!(tokens.next().ok_or("An expression may not be empty"));
     match token {
         LParen => {
-            let vec = expression(tokens, model);
-            assert_eq!(RParen, tokens.next().expect("Unbalanced parentheses"));
+            let vec = try!(expression(tokens, model));
+            let rparen = try!(tokens.next().ok_or("Unbalanced parentheses"));
+            if rparen != RParen {
+                return Err(format!("Expected ')', found {:?}", rparen))
+            }
             rhs(vec, tokens, model)
         },
         Word(word) => {
-            let vec = model.get(&*word).unwrap_or_else(||
-                panic!("'{}' is not present in the language model", &word)
-            );
+            let vec = try!(model.get(&*word).ok_or_else(||
+                format!("'{}' is not present in the language model", &word)
+            ));
             rhs(Ref(vec), tokens, model)
         },
-        _ => panic!("An expression may not start with {:?}", token),
+        _ => Err(format!("An expression may not start with {:?}", token)),
     }
 }
 
 
-fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &LanguageModel) -> MaybeRef<'a, WordVec>
+fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &LanguageModel)
+    -> Result<MaybeRef<'a, WordVec>, String>
     where I: Iterator<Item = char>
 {
     match tokens.peek() {
-        Some(&RParen) | None => return lhs,
+        Some(&RParen) | None => return Ok(lhs),
         _ => {}
     }
 
     let token = tokens.next().unwrap();
-    match tokens.next().unwrap() {
-        Plus => Val(lhs.take() + expression(tokens, model).deref()),
-        Minus => Val(lhs.take() - expression(tokens, model).deref()),
-        Word(_) | LParen => panic!("'{:?}' found in invalid position", token),
+    match token {
+        Plus => Ok(Val(lhs.take() + try!(expression(tokens, model)).deref())),
+        Minus => Ok(Val(lhs.take() - try!(expression(tokens, model)).deref())),
+        Word(_) | LParen => Err(format!("'{:?}' found in invalid position", token)),
+        Invalid(message) => Err(message),
         RParen => unreachable!(),
     }
 }
@@ -85,7 +92,7 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
             '-' => Minus,
             '(' => LParen,
             ')' => RParen,
-            c => panic!("{} was not expected", c)
+            c => Invalid(format!("{} was not expected", c)),
         })
     }
 
