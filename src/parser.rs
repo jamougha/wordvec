@@ -15,14 +15,12 @@ enum Token {
 
 use self::Token::*;
 
-fn expression<I>(tokens: &mut Tokens<I>, model: &LanguageModel) -> WordVec
-    where I: Iterator<Item = char>
-{
+fn expression<I>(tokens: &mut Tokens<I>, model: &LanguageModel) -> WordVec {
     let token = tokens.next().expect("An expression may not be empty");
     match token {
         LParen => {
             let vec = expression(tokens, model);
-            assert_eq!(RParen, tokens.next().unwrap());
+            assert_eq!(RParen, tokens.next().expect("Unbalanced parentheses"));
             rhs(vec, tokens, model)
         },
         Word(word) => {
@@ -35,9 +33,7 @@ fn expression<I>(tokens: &mut Tokens<I>, model: &LanguageModel) -> WordVec
     }
 }
 
-fn rhs<I>(lhs: WordVec, tokens: &mut Tokens<I>, model: &LanguageModel) -> WordVec
-    where I: Iterator<Item = char>
-{
+fn rhs<I>(lhs: WordVec, tokens: &mut Tokens<I>, model: &LanguageModel) -> WordVec {
     match tokens.peek() {
         Some(&RParen) | None => return lhs,
         _ => {}
