@@ -79,6 +79,10 @@ fn main() {
 
     let model = builder.build();
 
-    println!("{:?}", &model.nearest_words(model.get("linux").unwrap())[0..20]);
+    let linux = model.get("linux").unwrap();
+    let nearest = model.nearest_words(linux);
+    for word in nearest.iter().take(20) {
+        println!("{:?}, {}", word, linux.distance(word));
+    }
 
 }
