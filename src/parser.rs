@@ -43,11 +43,12 @@ fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &Langua
         _ => {}
     }
 
+    let token = tokens.next().unwrap();
     match tokens.next().unwrap() {
         Plus => Val(lhs.take() + expression(tokens, model).deref()),
         Minus => Val(lhs.take() - expression(tokens, model).deref()),
-        Word(word) => panic!("'{}' found in invalid position", word),
-        _ => unreachable!()
+        Word(_) | LParen => panic!("'{:?}' found in invalid position", token),
+        RParen => unreachable!(),
     }
 }
 
