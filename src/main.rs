@@ -63,8 +63,8 @@ fn visit_files<F: FnMut(BufReader<File>) -> ()>(path: &Path, mut file_processor:
 }
 
 fn main() {
-    const CORPUS_DIR: &'static str = "/home/jamougha/corpus";
-    const WORDS: &'static str = "/home/jamougha/corpus/word_counts.csv";
+    const CORPUS_DIR: &'static str = "/home/jamougha/corpus/pg";
+    const WORDS: &'static str = "/home/jamougha/corpus/pg/word_counts.csv";
     //find_most_common_words(CORPUS_DIR, WORDS);
     let words = load_most_common_words(WORDS);
     let mut builder = LanguageModelBuilder::new(words);
@@ -78,6 +78,6 @@ fn main() {
 
     let model = builder.build();
 
-    println!("{:?}", &model.nearest_words(model.get("linux").unwrap())[0..20]);
+    println!("{:?}", &model.nearest_words(model.get("king").unwrap())[0..20]);
 
 }
