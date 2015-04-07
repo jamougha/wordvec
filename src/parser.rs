@@ -1,7 +1,9 @@
 use super::models::{LanguageModel, WordVec};
+use self::Token::*;
+use super::mayberef::MaybeRef::{self, Val, Ref};
 
 pub fn parse(expr: &str, model: &LanguageModel) -> WordVec {
-    expression(&mut Tokens::from(expr.chars()), model)
+    expression(&mut Tokens::from(expr.chars()), model).take()
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -13,9 +15,9 @@ enum Token {
     Word(String),
 }
 
-use self::Token::*;
-
-fn expression<I>(tokens: &mut Tokens<I>, model: &LanguageModel) -> WordVec {
+fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel) -> MaybeRef<'a, WordVec>
+    where I: Iterator<Item = char>
+{
     let token = tokens.next().expect("An expression may not be empty");
     match token {
         LParen => {
@@ -26,24 +28,28 @@ fn expression<I>(tokens: &mut Tokens<I>, model: &LanguageModel) -> WordVec {
         Word(word) => {
             let vec = model.get(&*word).unwrap_or_else(||
                 panic!("'{}' is not present in the language model", &word)
-            ).clone();
-            rhs(vec, tokens, model)
+            );
+            rhs(Ref(vec), tokens, model)
         },
         _ => panic!("An expression may not start with {:?}", token),
     }
 }
 
-fn rhs<I>(lhs: WordVec, tokens: &mut Tokens<I>, model: &LanguageModel) -> WordVec {
+
+fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &LanguageModel) -> MaybeRef<'a, WordVec>
+    where I: Iterator<Item = char>
+{
     match tokens.peek() {
         Some(&RParen) | None => return lhs,
         _ => {}
     }
 
+    let token = tokens.next().unwrap();
     match tokens.next().unwrap() {
-        Plus => lhs + &expression(tokens, model),
-        Minus => lhs - &expression(tokens, model),
-        Word(word) => panic!("'{}' found in invalid position", word),
-        _ => unreachable!()
+        Plus => Val(lhs.take() + expression(tokens, model).deref()),
+        Minus => Val(lhs.take() - expression(tokens, model).deref()),
+        Word(_) | LParen => panic!("'{:?}' found in invalid position", token),
+        RParen => unreachable!(),
     }
 }
 
