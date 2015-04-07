@@ -1,6 +1,7 @@
 use super::models::{LanguageModel, WordVec};
 use self::Token::*;
 use super::mayberef::MaybeRef::{self, Val, Ref};
+use std::fmt::{Display, Formatter, Error};
 
 pub fn parse(expr: &str, model: &LanguageModel) -> Result<WordVec, String> {
     expression(&mut Tokens::from(expr.chars()), model).map(|w| w.take())
@@ -13,7 +14,24 @@ enum Token {
     Plus,
     Minus,
     Word(String),
-    Invalid(String),
+    Invalid(char),
+}
+
+impl Display for Token {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        let invalid;
+        fmt.write_str(match *self {
+            RParen => ")",
+            LParen => "(",
+            Plus => "+",
+            Minus => "-",
+            Word(ref w) => &**w,
+            Invalid(w) => {
+                invalid = w.to_string();
+                &*invalid
+            },
+        })
+    }
 }
 
 fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
@@ -26,7 +44,7 @@ fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
             let vec = try!(expression(tokens, model));
             let rparen = try!(tokens.next().ok_or("Unbalanced parentheses"));
             if rparen != RParen {
-                return Err(format!("Expected ')', found {:?}", rparen))
+                return Err(format!("Expected ')', found '{}'", rparen))
             }
             rhs(vec, tokens, model)
         },
@@ -36,7 +54,7 @@ fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
             ));
             rhs(Ref(vec), tokens, model)
         },
-        _ => Err(format!("An expression may not start with {:?}", token)),
+        _ => Err(format!("An expression may not start with '{}'", token)),
     }
 }
 
@@ -52,10 +70,10 @@ fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &Langua
 
     let token = tokens.next().unwrap();
     match token {
-        Plus => Ok(Val(lhs.take() + try!(expression(tokens, model)).deref())),
-        Minus => Ok(Val(lhs.take() - try!(expression(tokens, model)).deref())),
-        Word(_) | LParen => Err(format!("'{:?}' found in invalid position", token)),
-        Invalid(message) => Err(message),
+        Plus => Ok(Val(lhs.take() + &*try!(expression(tokens, model)))),
+        Minus => Ok(Val(lhs.take() - &*try!(expression(tokens, model)))),
+        Word(_) | LParen => Err(format!("'{}' found in invalid position", token)),
+        Invalid(s) => Err(format!("'{}' could not be tokenized", s)),
         RParen => unreachable!(),
     }
 }
@@ -92,7 +110,7 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
             '-' => Minus,
             '(' => LParen,
             ')' => RParen,
-            c => Invalid(format!("{} was not expected", c)),
+            c => Invalid(c),
         })
     }
 

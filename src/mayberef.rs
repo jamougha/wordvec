@@ -13,8 +13,12 @@ impl<'a, T: Clone> MaybeRef<'a, T> {
             Ref(t) => t.clone(),
         }
     }
+}
 
-    pub fn deref(&'a self) -> &'a T {
+impl<'a, T> Deref for MaybeRef<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
         match *self {
             Ref(t) => t,
             Val(ref t) => t,
