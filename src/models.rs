@@ -41,7 +41,7 @@ impl WordVec {
     fn normalize(&mut self, word_freqs: &Vec<f32>) {
         let count = self.count as f32;
         for i in 0..word_freqs.len() {
-            self.vec[i] = self.vec[i] / count / word_freqs[i];
+            self.vec[i] = self.vec[i] / count;
         }
     }
 
@@ -101,7 +101,7 @@ pub struct LanguageModelBuilder {
 }
 
 pub struct WordAcceptor<'a> {
-    window: VecDeque<String>,
+    window: VecDeque<(usize, String)>,
     builder: &'a mut LanguageModelBuilder,
 }
 
@@ -151,10 +151,8 @@ impl<'a> LanguageModelBuilder {
         &mut self.word_vecs[i]
     }
 
-    fn add_word(&mut self, from: &str, to: &str) {
-        let to_idx = self.words[to];
-        let from_vec = self.get_vec(from);
-        from_vec.inc(to_idx);
+    fn add_word(&mut self, from: usize, to: usize) {
+        self.word_vecs[from].inc(to);
     }
 
     fn word_seen(&mut self, word: &str) {
@@ -165,17 +163,19 @@ impl<'a> LanguageModelBuilder {
 impl<'a> WordAcceptor<'a> {
     pub fn add_word(&mut self, word: String) {
         let ww = self.builder.window_width;
-        let allow_word = self.builder.words.contains_key(&word);
+        let idx_opt = self.builder.words.get(&word).map(|w| *w);
 
-        if allow_word {
-            self.window.push_back(word);
+        if let Some(next_idx) = idx_opt {
+            self.window.push_back((next_idx, word));
             if self.window.len() > ww {
                 self.window.pop_front();
             }
+
             if self.window.len() == ww {
-                self.builder.word_seen(&self.window[ww / 2]);
-                for i in (0..ww).filter(|a| *a != (ww / 2)) {
-                    self.builder.add_word(&self.window[ww / 2], &self.window[i]);
+                let (center_idx, ref center_word) = self.window[ww / 2];
+                self.builder.word_seen(center_word);
+                for i in (0..ww).filter(|a| *a != ww / 2) {
+                    self.builder.add_word(center_idx, self.window[i].0);
                 }
             }
         }
@@ -192,10 +192,16 @@ impl LanguageModel {
     }
 
     pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
-        let mut vec_refs = self.word_vecs.iter().filter_map(|w|
-            if w.word != word.word { Some((w.distance(word), w)) } else { None }
-        ).collect::<Vec<_>>();
-        vec_refs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Equal));
+        let mut vec_refs = self.word_vecs.iter().filter_map(|w| {
+            let dist = w.distance(word);
+            if w.word != word.word && !dist.is_nan() { 
+                Some((w.distance(word), w)) 
+            } else { 
+                None 
+            }
+        }).collect::<Vec<_>>();
+        vec_refs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or_else(||
+            panic!("{:?}, {:?}", a, b)));
         vec_refs.into_iter().map(|x| x.1).collect()
     }
 }
