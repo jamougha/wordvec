@@ -17,7 +17,9 @@ impl Debug for WordVec {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         try!(self.word.fmt(fmt));
         try!(fmt.write_str(": "));
-        self.count.fmt(fmt)
+        try!(self.count.fmt(fmt));
+        try!(fmt.write_str(", "));
+        self.vec.iter().take(5).collect::<Vec<_>>().fmt(fmt)
     }
 }
 
@@ -76,7 +78,7 @@ impl<'a> Sub<&'a WordVec> for WordVec {
     fn sub(self, other: &WordVec) -> WordVec {
         debug_assert!(self.vec.len() == other.vec.len());
         let mut newvec = WordVec {
-            word: format!("{} + {}", &self.word, &other.word),
+            word: format!("{} - {}", &self.word, &other.word),
             count: 0,
             vec: self.vec,
         };

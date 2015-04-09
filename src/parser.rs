@@ -7,7 +7,7 @@ pub fn parse(expr: &str, model: &LanguageModel) -> Result<WordVec, String> {
     expression(&mut Tokens::from(expr.chars()), model).map(|w| w.take())
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 enum Token {
     RParen,
     LParen,
@@ -52,6 +52,7 @@ fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
             let vec = try!(model.get(&*word).ok_or_else(||
                 format!("'{}' is not present in the language model", &word)
             ));
+            println!("{:?}", vec);
             rhs(Ref(vec), tokens, model)
         },
         _ => Err(format!("An expression may not start with '{}'", token)),

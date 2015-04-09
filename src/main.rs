@@ -4,7 +4,7 @@ mod parser;
 mod mayberef;
 
 use std::fs::{File, read_dir};
-use std::io::{BufReader, BufRead, Read, Write};
+use std::io::{BufReader, BufRead, Read, Write, stdin};
 use std::path::{Path};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
@@ -24,10 +24,19 @@ fn visit_tokens<T: Read, F: FnMut(String) -> ()>(reader: BufReader<T>, mut count
     }
 }
 
+fn get_line() -> String {
+    let mut stdin = stdin();
+    let mut buffer = String::new();
+    stdin.read_line(&mut buffer).unwrap();
+    buffer
+}
+
+
+
 fn find_most_common_words(corpus_loc: &str, outfile: &str) {
     let path = Path::new(corpus_loc);
     let mut word_counts = HashMap::new();
-    visit_files(path, &mut |read| visit_tokens(read, &mut |s|
+    visit_files(path, 100000, &mut |read| visit_tokens(read, &mut |s|
         match (&mut word_counts).entry(s) {
             Vacant(e) => { e.insert(1); },
             Occupied(mut e) => { *e.get_mut() += 1; },
@@ -51,9 +60,9 @@ fn load_most_common_words(filename: &str) -> Vec<String> {
     ).collect()
 }
 
-fn visit_files<F: FnMut(BufReader<File>) -> ()>(path: &Path, mut file_processor: F) {
+fn visit_files<F: FnMut(BufReader<File>) -> ()>(path: &Path, num: usize, mut file_processor: F) {
     let files = read_dir(path);
-    for file in files.unwrap() {
+    for file in files.unwrap().take(num) {
         let path = file.unwrap().path();
         if path.to_str().unwrap().ends_with(".txt") {
             let file = File::open(&path).unwrap();
@@ -72,17 +81,32 @@ fn main() {
 
     let path = Path::new(CORPUS_DIR);
 
-    visit_files(&path, |read| {
+    visit_files(&path, 100000, |read| {
         let mut acc = (&mut builder).new_file();
         visit_tokens(read, |w| (&mut acc).add_word(w));
     });
 
     let model = builder.build();
+    println!("Model loaded");
+    loop {
+        println!("");
+        let input = get_line();
+        if input.starts_with(":q") {
+            break;
+        }
 
-    let linux = model.get("king").unwrap();
-    let nearest = model.nearest_words(linux);
-    for word in nearest.iter().take(20) {
-        println!("{:?}, {}", word, linux.distance(word));
+        match parser::parse(input.trim_matches(|c: char| c.is_whitespace()), &model) {
+            Ok(word_vec) => {
+                let nearest = model.nearest_words(&word_vec);
+                println!(" = {:?}", word_vec);
+                println!("-------------");
+                for word in nearest.iter().take(20) {
+                    println!("{:?}, {}", word, word_vec.distance(word));
+                }
+            }
+            Err(e) => println!("{:?}", e)
+        }
+
     }
 
 }
