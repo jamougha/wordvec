@@ -2,7 +2,6 @@ use std::ops::{Add, Sub};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::collections::VecDeque;
-use std::cmp::Ordering::Equal;
 use std::iter::repeat;
 use std::fmt::{Debug, Formatter, Error};
 
@@ -40,10 +39,10 @@ impl WordVec {
         }
     }
 
-    fn normalize(&mut self, word_freqs: &Vec<f32>) {
+    fn normalize(&mut self) {
         let count = self.count as f32;
-        for i in 0..word_freqs.len() {
-            self.vec[i] = self.vec[i] / count;
+        for f in &mut self.vec {
+            *f /= count;
         }
     }
 
@@ -107,8 +106,8 @@ pub struct WordAcceptor<'a> {
     builder: &'a mut LanguageModelBuilder,
 }
 
-impl<'a> LanguageModelBuilder {
-    pub fn new(words: Vec<String>) -> LanguageModelBuilder {
+impl LanguageModelBuilder {
+    pub fn new(window_radius: usize, words: Vec<String>) -> LanguageModelBuilder {
 
         let word_vecs = words.iter()
                              .map(|s| WordVec::new(s.clone(), words.len()))
@@ -120,19 +119,15 @@ impl<'a> LanguageModelBuilder {
                              .map(|(a, b)| (b, a)));
 
         LanguageModelBuilder {
-            window_width: 21,
+            window_width: 2 * window_radius + 1,
             words: words,
             word_vecs: word_vecs,
         }
     }
 
     pub fn build(mut self) -> LanguageModel {
-        let total_words = self.word_vecs.iter().fold(0.0, |a, b| a + b.count as f32);
-        let word_freqs = self.word_vecs.iter()
-                                       .map(|v| (v.count as f32 / total_words).max(1.0/total_words))
-                                       .collect::<Vec<_>>();
         for vec in self.word_vecs.iter_mut() {
-            vec.normalize(&word_freqs);
+            vec.normalize();
         }
 
         LanguageModel {
@@ -141,7 +136,7 @@ impl<'a> LanguageModelBuilder {
         }
     }
 
-    pub fn new_file(&'a mut self) -> WordAcceptor<'a> {
+    pub fn new_file<'a>(&'a mut self) -> WordAcceptor<'a> {
         WordAcceptor {
             window: VecDeque::new(),
             builder: self,
