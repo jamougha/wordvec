@@ -185,7 +185,7 @@ mod test {
         assert_eq!(s, vec![Word("abc".to_string()), Plus, Word("def".to_string())]);
     }
 
-        #[test]
+    #[test]
     fn bracket_tokens() {
         let s = Tokens::from(" ()  (abc  +)def".chars()).collect::<Vec<_>>();
         assert_eq!(s, vec![LParen, RParen, LParen, Word("abc".to_string()),
