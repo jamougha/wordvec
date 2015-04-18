@@ -181,18 +181,14 @@ impl<'a> WordAcceptor<'a> {
 
 impl LanguageModel {
     pub fn get(&self, word: &str) -> Option<&WordVec> {
-        if let Some(i) = self.words.get(word) {
-            Some(&self.word_vecs[*i])
-        } else {
-            None
-        }
+        self.words.get(word).map(|i| &self.word_vecs[*i])
     }
 
     pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
         let mut vec_refs = self.word_vecs.iter().filter_map(|w| {
             let dist = w.distance(word);
-            if w.word != word.word && !dist.is_nan() { 
-                Some((w.distance(word), w)) 
+            if w.word != word.word { 
+                Some((dist, w)) 
             } else { 
                 None 
             }

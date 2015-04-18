@@ -1,4 +1,3 @@
-#![feature(std_misc)]
 mod models;
 mod parser;
 mod mayberef;
@@ -8,7 +7,6 @@ use std::io::{BufReader, BufRead, Read, Write, stdin};
 use std::path::{Path};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
-use std::ascii::OwnedAsciiExt;
 use models::*;
 
 fn get_line() -> String {
@@ -40,7 +38,7 @@ fn find_most_common_words(corpus_loc: &str, outfile: &str) {
 
 }
 
-fn load_most_common_words(filename: &str) -> Vec<String> {
+fn load_most_common_words(filename: &str, num: usize) -> Vec<String> {
     let file = File::open(&Path::new(filename)).unwrap();
     let reader = BufReader::new(file);
     reader.lines().map(|line|
@@ -73,23 +71,11 @@ fn files(path: &Path) -> Box<Iterator<Item=BufReader<File>>> {
             }))
 }
 
-fn visit_files<F: FnMut(BufReader<File>) -> ()>(path: &Path, num: usize, mut file_processor: F) {
-    let files = read_dir(path);
-    for file in files.unwrap().take(num) {
-        let path = file.unwrap().path();
-        if path.to_str().unwrap().ends_with(".txt") {
-            let file = File::open(&path).unwrap();
-            let reader = BufReader::new(file);
-            file_processor(reader);
-        }
-    }
-}
-
 fn main() {
     const CORPUS_DIR: &'static str = "/home/jamougha/corpus/pg";
     const WORDS: &'static str = "/home/jamougha/corpus/pg/word_counts.csv";
     //find_most_common_words(CORPUS_DIR, WORDS);
-    let words = load_most_common_words(WORDS);
+    let words = load_most_common_words(WORDS, 10000);
     let mut builder = LanguageModelBuilder::new(10, words);
 
     let path = Path::new(CORPUS_DIR);

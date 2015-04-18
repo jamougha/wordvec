@@ -25,7 +25,7 @@ impl Display for Token {
             LParen => "(",
             Plus => "+",
             Minus => "-",
-            Word(ref w) => &**w,
+            Word(ref w) => &*w,
             Invalid(w) => {
                 invalid = w.to_string();
                 &*invalid
@@ -145,14 +145,8 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
         while let Some('a'...'z') = self.peek_char() {
             token.push(self.take().unwrap());
         }
-
+ 
         Word(token)
-    }
-
-    fn single_char(&mut self) -> String {
-        let mut token = String::new();
-        token.push(self.take().unwrap());
-        token
     }
 
 }
@@ -167,8 +161,6 @@ impl<I> Iterator for Tokens<I> where I: Iterator<Item = char> {
 }
 
 mod test {
-    use super::Tokens;
-    use super::Token::*;
     #[test]
     fn single_character() {
         let c = Tokens::from("a".chars()).next().unwrap();
