@@ -77,7 +77,7 @@ fn main() {
     const WORDS: &'static str = "/home/jamougha/corpus/pg/word_counts.csv";
     //find_most_common_words(CORPUS_DIR, WORDS);
     let words = load_most_common_words(WORDS);
-    let mut builder = LanguageModelBuilder::new(words);
+    let mut builder = LanguageModelBuilder::new(10, words);
 
     let path = Path::new(CORPUS_DIR);
 
