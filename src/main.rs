@@ -11,19 +11,6 @@ use std::collections::hash_map::Entry::*;
 use std::ascii::OwnedAsciiExt;
 use models::*;
 
-fn visit_tokens<T: Read, F: FnMut(String) -> ()>(reader: BufReader<T>, mut counter: F) {
-    for line in reader.lines() {
-    	if let Ok(line) = line {
-	    	for word in line.split(|c: char| !c.is_alphabetic()) {
-	    		if word.len() > 0 {
-	    			let word = word.to_string().into_ascii_lowercase();
-		    		counter(word);
-		    	}
-	    	}
-	    }
-    }
-}
-
 fn get_line() -> String {
     let mut stdin = stdin();
     let mut buffer = String::new();
@@ -31,16 +18,17 @@ fn get_line() -> String {
     buffer
 }
 
-
-
 fn find_most_common_words(corpus_loc: &str, outfile: &str) {
     let path = Path::new(corpus_loc);
     let mut word_counts = HashMap::new();
-    visit_files(path, 100000, &mut |read| visit_tokens(read, &mut |s|
-        match (&mut word_counts).entry(s) {
+    let words = files(path).flat_map(|file| read_words(file));
+
+    for word in words {
+        match word_counts.entry(word) {
             Vacant(e) => { e.insert(1); },
             Occupied(mut e) => { *e.get_mut() += 1; },
-    }));
+        }
+    }
 
     let mut counts: Vec<_> = word_counts.into_iter().collect();
     counts.sort_by(|a, b| b.1.cmp(&a.1));
@@ -57,7 +45,32 @@ fn load_most_common_words(filename: &str) -> Vec<String> {
     let reader = BufReader::new(file);
     reader.lines().map(|line|
         line.unwrap().split(',').next().unwrap().to_string()
-    ).collect()
+    )
+    .take(num)
+    .collect()
+}
+
+fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item=String>> {
+    Box::new(reader.lines()
+                   .filter_map(|line| line.ok())
+                   .flat_map(|line| {
+                       let words = line.split(|c: char| !c.is_alphabetic() && c != '\'')
+                                       .map(|word| word.to_string())
+                                       .collect::<Vec<_>>();
+                       words.into_iter()
+                   }))
+}
+
+fn files(path: &Path) -> Box<Iterator<Item=BufReader<File>>> {
+    Box::new(
+        read_dir(path)
+            .unwrap()
+            .map(|path| path.unwrap().path())
+            .filter(|path| path.to_str().unwrap().ends_with(".txt"))
+            .map(|path| {
+                let file = File::open(&path).unwrap();
+                BufReader::new(file)
+            }))
 }
 
 fn visit_files<F: FnMut(BufReader<File>) -> ()>(path: &Path, num: usize, mut file_processor: F) {
@@ -81,10 +94,12 @@ fn main() {
 
     let path = Path::new(CORPUS_DIR);
 
-    visit_files(&path, 100000, |read| {
-        let mut acc = (&mut builder).new_file();
-        visit_tokens(read, |w| (&mut acc).add_word(w));
-    });
+    for file in files(path) {
+        let mut acc = builder.new_file();
+        for word in read_words(file) {
+            acc.add_word(word);
+        }
+    }
 
     let model = builder.build();
     println!("Model loaded");
