@@ -44,6 +44,12 @@ impl Display for Token {
     }
 }
 
+fn get_word<'a>(model: &'a LanguageModel, word: &str) -> Result<&'a WordVec, String> {
+    model.get(&*word).ok_or_else(||
+        format!("'{}' is not present in the language model", &word)
+    )
+}
+
 fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
     -> Result<MaybeRef<'a, WordVec>, String>
     where I: Iterator<Item = char>
@@ -59,9 +65,7 @@ fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
             rhs(vec, tokens, model)
         },
         Word(word) => {
-            let vec = try!(model.get(&*word).ok_or_else(||
-                format!("'{}' is not present in the language model", &word)
-            ));
+            let vec = try!(get_word(model, &*word));
             rhs(Ref(vec), tokens, model)
         },
         _ => Err(format!("An expression may not start with '{}'", token)),
@@ -117,9 +121,7 @@ fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
             }
         }
         Word(word) =>  {
-            let vec = try!(model.get(&*word).ok_or_else(||
-                format!("'{}' is not present in the language model", &word)
-            ));
+            let vec = try!(get_word(model, &*word));
             Ok(Ref(vec))
         }
         _ => unreachable!(),
