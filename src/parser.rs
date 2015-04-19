@@ -17,6 +17,16 @@ enum Token {
     Invalid(char),
 }
 
+impl Token {
+    fn apply_addop(&self, lhs: WordVec, rhs: &WordVec) -> Result<WordVec, String> {
+        match *self {
+            Plus => Ok(lhs + rhs),
+            Minus => Ok(lhs - rhs),
+            _ => Err(format!("Internal error: tried calling add using {}", self)),
+        }
+    }
+}
+
 impl Display for Token {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         let invalid;
@@ -70,8 +80,12 @@ fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &Langua
 
     let token = tokens.next().unwrap();
     match token {
-        Plus => Ok(Val(lhs.take() + &*try!(expression(tokens, model)))),
-        Minus => Ok(Val(lhs.take() - &*try!(expression(tokens, model)))),
+        Plus | Minus => {
+            let lhs = lhs.take();
+            let atom = try!(atom(tokens, model));
+            let result = try!(token.apply_addop(lhs, &*atom));
+            rhs(Val(result), tokens, model)
+        }
         Word(_) | LParen => Err(format!("'{}' found in invalid position", token)),
         Invalid(s) => Err(format!("'{}' could not be tokenized", s)),
         RParen => unreachable!(),
