@@ -27,6 +27,8 @@ impl<'a, T> Deref for MaybeRef<'a, T> {
 }
 
 mod test {
+    use super::MaybeRef::*;
+
     #[test]
     fn test() {
         let x = "foo";

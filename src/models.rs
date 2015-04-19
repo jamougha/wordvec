@@ -5,7 +5,7 @@ use std::collections::VecDeque;
 use std::iter::repeat;
 use std::fmt::{Debug, Formatter, Error};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct WordVec {
     pub word: String,
     pub count: u64,
@@ -82,7 +82,7 @@ impl<'a> Sub<&'a WordVec> for WordVec {
             vec: self.vec,
         };
 
-        for i in 0..10_000 {
+        for i in 0..(newvec.vec.len()) {
             newvec.vec[i] -= other.vec[i];
         }
 
@@ -187,10 +187,10 @@ impl LanguageModel {
     pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
         let mut vec_refs = self.word_vecs.iter().filter_map(|w| {
             let dist = w.distance(word);
-            if w.word != word.word { 
-                Some((dist, w)) 
-            } else { 
-                None 
+            if w.word != word.word {
+                Some((dist, w))
+            } else {
+                None
             }
         }).collect::<Vec<_>>();
         vec_refs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or_else(||

@@ -145,7 +145,7 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
         while let Some('a'...'z') = self.peek_char() {
             token.push(self.take().unwrap());
         }
- 
+
         Word(token)
     }
 
@@ -161,6 +161,11 @@ impl<I> Iterator for Tokens<I> where I: Iterator<Item = char> {
 }
 
 mod test {
+    use super::Tokens;
+    use super::Token::*;
+    use super::expression;
+    use super::super::models::{WordVec, LanguageModel, LanguageModelBuilder};
+
     #[test]
     fn single_character() {
         let c = Tokens::from("a".chars()).next().unwrap();
@@ -190,5 +195,25 @@ mod test {
         let s = Tokens::from(" ()  (abc  +)def".chars()).collect::<Vec<_>>();
         assert_eq!(s, vec![LParen, RParen, LParen, Word("abc".to_string()),
             Plus, RParen, Word("def".to_string())]);
+    }
+
+    #[test]
+    fn test_associativity() {
+        let words = vec!("a".to_string(), "b".to_string(), "c".to_string());
+        let mut builder = LanguageModelBuilder::new(1, words);
+
+        {
+            let mut acc = builder.new_file();
+            let text = "x x a a b a c b x x";
+            for word in text.split(' ') {
+                acc.add_word(word.to_string());
+            }
+        }
+
+        let model = builder.build();
+        let mut a = Tokens::from("a - b + c".chars());
+        let mut b = Tokens::from("(a - b) + c".chars());
+        assert_eq!(expression(&mut a, &model).unwrap().take(),
+                   expression(&mut b, &model).unwrap().take());
     }
 }
