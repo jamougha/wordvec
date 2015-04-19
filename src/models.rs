@@ -5,11 +5,17 @@ use std::collections::VecDeque;
 use std::iter::repeat;
 use std::fmt::{Debug, Formatter, Error};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone,)]
 pub struct WordVec {
     pub word: String,
     pub count: u64,
     vec: Vec<f32>,
+}
+
+impl PartialEq for WordVec {
+    fn eq(&self, other: &WordVec) -> bool {
+        self.vec == other.vec
+    }
 }
 
 impl Debug for WordVec {

@@ -243,7 +243,7 @@ mod test {
     }
 
     #[test]
-    fn test_associativity() {
+    fn test_addition() {
         use super::parse;
         use super::super::models::{WordVec, LanguageModel, LanguageModelBuilder};
 
@@ -260,5 +260,8 @@ mod test {
 
         let model = builder.build();
         assert_eq!(parse("a - b + c", &model).unwrap(), parse("(a - b) + c", &model).unwrap());
+        assert_eq!(parse("a + (b - c)", &model).unwrap(), parse("(a + b) - c", &model).unwrap());
+        assert_eq!(parse("a + b - c)", &model).unwrap(), parse("a - c + b", &model).unwrap());
+        assert!(parse("a + b", &model) != parse("a - b", &model));
     }
 }
