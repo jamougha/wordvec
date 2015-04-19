@@ -78,6 +78,40 @@ fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &Langua
     }
 }
 
+fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
+    -> Result<MaybeRef<'a, WordVec>, String>
+    where I: Iterator<Item = char>
+{
+    {
+        let token = try!(tokens.peek().ok_or("Invalid end of expression"));
+        match *token {
+            Plus | Minus | Invalid(_) | RParen => {
+                return Err(format!("Invalid token {}", token));
+            }
+            _ => {},
+        }
+    }
+
+    let token = tokens.next().unwrap();
+    match token {
+        LParen => {
+            let expr = try!(expression(tokens, model));
+            match tokens.next() {
+                Some(RParen) => Ok(expr),
+                Some(t) => Err(format!("Expected ')', found '{}'", t)),
+                None => Err("Unclosed parentheses".to_string()),
+            }
+        }
+        Word(word) =>  {
+            let vec = try!(model.get(&*word).ok_or_else(||
+                format!("'{}' is not present in the language model", &word)
+            ));
+            Ok(Ref(vec))
+        }
+        _ => unreachable!(),
+    }
+}
+
 struct Tokens<I> {
     iter: I,
     next_char: Option<Option<char>>,
