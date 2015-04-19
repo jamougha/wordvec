@@ -161,39 +161,35 @@ impl<I> Iterator for Tokens<I> where I: Iterator<Item = char> {
 }
 
 mod test {
+    use super::Tokens;
+    use super::Token::*;
 
     #[test]
     fn single_character() {
-        use super::Tokens;
         let c = Tokens::from("a".chars()).next().unwrap();
         assert_eq!(c, Word("a".to_string()));
     }
 
     #[test]
     fn single_token() {
-        use super::Tokens;
         let s = Tokens::from("abc".chars()).next().unwrap();
         assert_eq!(s, Word("abc".to_string()));
     }
 
     #[test]
     fn two_tokens() {
-        use super::Tokens;
         let s = Tokens::from("abc def".chars()).collect::<Vec<_>>();
         assert_eq!(s, vec![Word("abc".to_string()), Word("def".to_string())]);
     }
 
     #[test]
     fn plus_tokens() {
-        use super::Tokens;
         let s = Tokens::from("   abc  +def".chars()).collect::<Vec<_>>();
         assert_eq!(s, vec![Word("abc".to_string()), Plus, Word("def".to_string())]);
     }
 
     #[test]
     fn bracket_tokens() {
-        use super::Tokens;
-        use super::Token::*;
         let s = Tokens::from(" ()  (abc  +)def".chars()).collect::<Vec<_>>();
         assert_eq!(s, vec![LParen, RParen, LParen, Word("abc".to_string()),
             Plus, RParen, Word("def".to_string())]);
@@ -201,7 +197,7 @@ mod test {
 
     #[test]
     fn test_associativity() {
-        use super::expression;
+        use super::parse;
         use super::super::models::{WordVec, LanguageModel, LanguageModelBuilder};
 
         let words = vec!("a".to_string(), "b".to_string(), "c".to_string());
@@ -216,9 +212,6 @@ mod test {
         }
 
         let model = builder.build();
-        let mut a = Tokens::from("a - b + c".chars());
-        let mut b = Tokens::from("(a - b) + c".chars());
-        assert_eq!(expression(&mut a, &model).unwrap().take(),
-                   expression(&mut b, &model).unwrap().take());
+        assert_eq!(parse("a - b + c", &model).unwrap(), parse("(a - b) + c", &model).unwrap());
     }
 }
