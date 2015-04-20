@@ -32,7 +32,7 @@ fn find_most_common_words(corpus_loc: &str, outfile: &str) {
     counts.sort_by(|a, b| b.1.cmp(&a.1));
 
     let mut out = File::create(&Path::new(outfile)).unwrap();
-    for &(ref word, count) in &counts {
+    for (word, count) in counts {
         out.write_all(format!("{}, {}\n", word, count).as_bytes()).unwrap();
     }
 
