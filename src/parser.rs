@@ -37,7 +37,7 @@ impl Display for Token {
             LParen => "(",
             Plus => "+",
             Minus => "-",
-            Divide => "\\",
+            Divide => "/",
             Word(ref w) => &*w,
             Number(i) => {
                 string = format!("{}", i);
@@ -190,6 +190,7 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
             '-' => Minus,
             '(' => LParen,
             ')' => RParen,
+            '/' => Divide,
             c => Invalid(c),
         })
     }
@@ -316,4 +317,12 @@ mod test {
         println!("{:?} == {:?}", a, a.clone() + &a);
         assert!(a == (a.clone() + &a) / 2);
     }
+
+    #[test]
+    fn test_div_expression() {
+        let model = get_model();
+        let a = model.get("a").unwrap().clone();
+        assert_eq!(a, parse("(a + a) / 2", &model).unwrap());
+    }
+
 }
