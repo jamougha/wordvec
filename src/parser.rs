@@ -13,8 +13,10 @@ enum Token {
     LParen,
     Plus,
     Minus,
+    Divide,
     Word(String),
     Invalid(char),
+    Number(i32),
 }
 
 impl Token {
@@ -29,16 +31,21 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
-        let invalid;
+        let string;
         fmt.write_str(match *self {
             RParen => ")",
             LParen => "(",
             Plus => "+",
             Minus => "-",
+            Divide => "\\",
             Word(ref w) => &*w,
+            Number(i) => {
+                string = format!("{}", i);
+                &*string
+            }
             Invalid(w) => {
-                invalid = w.to_string();
-                &*invalid
+                string = w.to_string();
+                &*string
             },
         })
     }
@@ -54,22 +61,28 @@ fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
     -> Result<MaybeRef<'a, WordVec>, String>
     where I: Iterator<Item = char>
 {
-    let token = try!(tokens.next().ok_or("An expression may not be empty"));
-    match token {
-        LParen => {
-            let vec = try!(expression(tokens, model));
-            let rparen = try!(tokens.next().ok_or("Unbalanced parentheses"));
-            if rparen != RParen {
-                return Err(format!("Expected ')', found '{}'", rparen))
-            }
-            rhs(vec, tokens, model)
-        },
-        Word(word) => {
-            let vec = try!(get_word(model, &*word));
-            rhs(Ref(vec), tokens, model)
-        },
-        _ => Err(format!("An expression may not start with '{}'", token)),
+    let atom = try!(atom(tokens, model));
+    match tokens.peek() {
+        Some(&Plus) | Some(&Minus) => rhs(atom, tokens, model),
+        None => Ok(atom),
+        _ => Err(format!("Invalid token '{:?}'", tokens.peek().unwrap()))
     }
+    // let token = try!(tokens.next().ok_or("An expression may not be empty"));
+    // match token {
+    //     LParen => {
+    //         let vec = try!(expression(tokens, model));
+    //         let rparen = try!(tokens.next().ok_or("Unbalanced parentheses"));
+    //         if rparen != RParen {
+    //             return Err(format!("Expected ')', found '{}'", rparen))
+    //         }
+    //         rhs(vec, tokens, model)
+    //     },
+    //     Word(word) => {
+    //         let vec = try!(get_word(model, &*word));
+    //         rhs(Ref(vec), tokens, model)
+    //     },
+    //     _ => Err(format!("An expression may not start with '{}'", token)),
+    // }
 }
 
 
@@ -92,6 +105,7 @@ fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &Langua
         }
         Word(_) | LParen => Err(format!("'{}' found in invalid position", token)),
         Invalid(s) => Err(format!("'{}' could not be tokenized", s)),
+        Divide | Number(_) => Err("Not sure how we got here!".to_string()),
         RParen => unreachable!(),
     }
 }
@@ -111,21 +125,36 @@ fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
     }
 
     let token = tokens.next().unwrap();
-    match token {
+    let atom = match token {
         LParen => {
             let expr = try!(expression(tokens, model));
             match tokens.next() {
-                Some(RParen) => Ok(expr),
-                Some(t) => Err(format!("Expected ')', found '{}'", t)),
-                None => Err("Unclosed parentheses".to_string()),
+                Some(RParen) => expr,
+                Some(t) => return Err(format!("Expected ')', found '{}'", t)),
+                None => return Err("Unclosed parentheses".to_string()),
             }
         }
         Word(word) =>  {
             let vec = try!(get_word(model, &*word));
-            Ok(Ref(vec))
+            Ref(vec)
         }
         _ => unreachable!(),
+    };
+
+    if tokens.peek() != Some(&Divide) {
+        return Ok(atom);
     }
+
+    tokens.next();
+
+    let num = try!(tokens.next().ok_or(
+        "An expression may not end with a division operator"));
+
+    match num {
+        Number(num) => Ok(Val(atom.take() / num)),
+        _ => Err(format!("'{}' is not a valid numerator: must be an integer", num)),
+    }
+
 }
 
 struct Tokens<I> {
@@ -150,6 +179,7 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
 
         match self.peek_char() {
             Some('a'...'z') => return Some(self.word()),
+            Some('0'...'9') => return Some(self.number()),
             // Some('0'..'9') | Some('.') => return Some(self.number()),
             None => return None,
             _ => {}
@@ -196,6 +226,15 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
         }
 
         Word(token)
+    }
+
+    fn number(&mut self) -> Token {
+        let mut token = String::new();
+        while let Some('0'...'9') = self.peek_char() {
+            token.push(self.take().unwrap());
+        }
+
+        Number(token.parse().unwrap())
     }
 
 }
