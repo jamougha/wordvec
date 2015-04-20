@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, Sub, Div};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::collections::VecDeque;
@@ -56,6 +56,18 @@ impl WordVec {
         self.vec[i] += 1.0;
     }
 
+}
+
+impl Div<i32> for WordVec {
+    type Output = WordVec;
+
+    fn div(mut self, i: i32) -> WordVec {
+        for f in &mut self.vec {
+            *f /= i as f32;
+        }
+
+        self
+    }
 }
 
 impl<'a> Add<&'a WordVec> for WordVec {
