@@ -212,6 +212,8 @@ impl<I> Iterator for Tokens<I> where I: Iterator<Item = char> {
 mod test {
     use super::Tokens;
     use super::Token::*;
+    use super::parse;
+    use super::super::models::{WordVec, LanguageModel, LanguageModelBuilder};
 
     #[test]
     fn single_character() {
@@ -244,11 +246,7 @@ mod test {
             Plus, RParen, Word("def".to_string())]);
     }
 
-    #[test]
-    fn test_addition() {
-        use super::parse;
-        use super::super::models::{WordVec, LanguageModel, LanguageModelBuilder};
-
+    fn get_model() -> LanguageModel {
         let words = vec!("a".to_string(), "b".to_string(), "c".to_string());
         let mut builder = LanguageModelBuilder::new(1, words);
 
@@ -260,10 +258,23 @@ mod test {
             }
         }
 
-        let model = builder.build();
+        builder.build()
+    }
+
+    #[test]
+    fn test_addition() {
+        let model = get_model();
         assert_eq!(parse("a - b + c", &model).unwrap(), parse("(a - b) + c", &model).unwrap());
         assert_eq!(parse("a + (b - c)", &model).unwrap(), parse("(a + b) - c", &model).unwrap());
         assert_eq!(parse("a + b - c)", &model).unwrap(), parse("a - c + b", &model).unwrap());
         assert!(parse("a + b", &model) != parse("a - b", &model));
+    }
+
+    #[test]
+    fn test_division() {
+        let model = get_model();
+        let a = model.get("a").unwrap().clone();
+        println!("{:?} == {:?}", a, a.clone() + &a);
+        assert!(a == (a.clone() + &a) / 2);
     }
 }
