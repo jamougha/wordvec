@@ -26,6 +26,7 @@ impl<'a, T> Deref for MaybeRef<'a, T> {
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::MaybeRef::*;
 

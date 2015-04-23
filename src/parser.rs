@@ -223,6 +223,7 @@ impl<I> Iterator for Tokens<I> where I: Iterator<Item = char> {
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::Tokens;
     use super::Token::*;
