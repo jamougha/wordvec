@@ -67,22 +67,6 @@ fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
         None => Ok(atom),
         _ => Err(format!("Invalid token '{:?}'", tokens.peek().unwrap()))
     }
-    // let token = try!(tokens.next().ok_or("An expression may not be empty"));
-    // match token {
-    //     LParen => {
-    //         let vec = try!(expression(tokens, model));
-    //         let rparen = try!(tokens.next().ok_or("Unbalanced parentheses"));
-    //         if rparen != RParen {
-    //             return Err(format!("Expected ')', found '{}'", rparen))
-    //         }
-    //         rhs(vec, tokens, model)
-    //     },
-    //     Word(word) => {
-    //         let vec = try!(get_word(model, &*word));
-    //         rhs(Ref(vec), tokens, model)
-    //     },
-    //     _ => Err(format!("An expression may not start with '{}'", token)),
-    // }
 }
 
 
@@ -114,17 +98,8 @@ fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
     -> Result<MaybeRef<'a, WordVec>, String>
     where I: Iterator<Item = char>
 {
-    {
-        let token = try!(tokens.peek().ok_or("Invalid end of expression"));
-        match *token {
-            Plus | Minus | Invalid(_) | RParen => {
-                return Err(format!("Invalid token {}", token));
-            }
-            _ => {},
-        }
-    }
+    let token = try!(tokens.next().ok_or("Invalid end of expression"));
 
-    let token = tokens.next().unwrap();
     let atom = match token {
         LParen => {
             let expr = try!(expression(tokens, model));
@@ -138,7 +113,7 @@ fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
             let vec = try!(get_word(model, &*word));
             Ref(vec)
         }
-        _ => unreachable!(),
+        _ => return Err(format!("Invalid token {}", token)),
     };
 
     if tokens.peek() != Some(&Divide) {
@@ -180,7 +155,6 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
         match self.peek_char() {
             Some('a'...'z') => return Some(self.word()),
             Some('0'...'9') => return Some(self.number()),
-            // Some('0'..'9') | Some('.') => return Some(self.number()),
             None => return None,
             _ => {}
         }
