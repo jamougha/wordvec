@@ -4,6 +4,8 @@ use std::iter::FromIterator;
 use std::collections::VecDeque;
 use std::iter::repeat;
 use std::fmt::{Debug, Formatter, Error};
+use std::cmp::Ordering::Equal;
+use std::f32;
 
 #[derive(Clone,)]
 pub struct WordVec {
@@ -30,11 +32,22 @@ impl Debug for WordVec {
 
 impl WordVec {
 
-    pub fn distance(&self, other: &WordVec) -> f32 {
+    fn dot_prod(&self, other: &WordVec) -> f32 {
         self.vec.iter()
                 .zip(other.vec.iter())
-                .map(|(x, y)| (x*x - y*y).abs().sqrt())
+                .map(|(x, y)| x * y)
                 .fold(0.0, |x, y| x + y)
+    }
+
+    fn magnitude(&self) -> f32 {
+        self.vec.iter()
+                .map(|x| x * x)
+                .fold(0.0, |x, y| x + y)
+                .sqrt()
+    }
+
+    pub fn distance(&self, other: &WordVec) -> f32 {
+        self.dot_prod(other) / (self.magnitude() * other.magnitude())
     }
 
     fn new(word: String, num_words: usize) -> WordVec {
@@ -49,6 +62,13 @@ impl WordVec {
         let count = self.count as f32;
         for f in &mut self.vec {
             *f /= count;
+        }
+    }
+
+    fn rescale(&mut self, vec_scales: &Vec<(f32, f32)>) {
+        for i in 0..self.vec.len() {
+            let (min, max) = vec_scales[i];
+            self.vec[i] = 2.0 * (self.vec[i] - min) / (max - min) - 1.0;
         }
     }
 
@@ -144,8 +164,22 @@ impl LanguageModelBuilder {
     }
 
     pub fn build(mut self) -> LanguageModel {
+        let len = self.word_vecs[0].vec.len();
+        let mut vec_scales: Vec<(f32, f32)> = repeat((0.0, f32::MAX)).take(len).collect();
+
         for vec in self.word_vecs.iter_mut() {
             vec.normalize();
+        }
+
+        for (i, vec) in self.word_vecs.iter().map(|w| &w.vec).enumerate() {
+            for j in (0..len).filter(|j| i != *j) {
+                let (min, max) = vec_scales[j];
+                vec_scales[j] = (min.min(vec[j]), max.max(vec[j]))
+            }
+        }
+
+        for vec in self.word_vecs.iter_mut() {
+            vec.rescale(&vec_scales);
         }
 
         LanguageModel {
@@ -205,14 +239,16 @@ impl LanguageModel {
     pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
         let mut vec_refs = self.word_vecs.iter().filter_map(|w| {
             let dist = w.distance(word);
-            if w.word != word.word {
+            if w.word != word.word && !dist.is_nan() {
                 Some((dist, w))
             } else {
                 None
             }
         }).collect::<Vec<_>>();
-        vec_refs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or_else(||
-            panic!("{:?}, {:?}", a, b)));
+        vec_refs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or_else(|| {
+            println!("bad vector: {:?}, {:?}", a, b);
+            Equal
+        }));
         vec_refs.into_iter().map(|x| x.1).collect()
     }
 }
