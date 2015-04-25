@@ -1,3 +1,6 @@
+ #![feature(std_misc)]
+extern crate time;
+
 mod models;
 mod parser;
 mod mayberef;
@@ -7,6 +10,7 @@ use std::io::{BufReader, BufRead, Read, Write, stdin};
 use std::path::{Path};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
+use std::ascii::OwnedAsciiExt;
 use models::*;
 
 fn get_line() -> String {
@@ -52,8 +56,12 @@ fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item=String>> {
     Box::new(reader.lines()
                    .filter_map(|line| line.ok())
                    .flat_map(|line| {
-                       let words = line.split(|c: char| !c.is_alphabetic() && c != '\'')
-                                       .map(|word| word.to_string())
+                       let words = line.split(|c| match c {
+                                            'a'...'z' => false,
+                                            _ => true,
+                                        })
+                                       .filter(|word| !word.is_empty())
+                                       .map(|word| word.to_string().into_ascii_lowercase())
                                        .collect::<Vec<_>>();
                        words.into_iter()
                    }))
@@ -74,7 +82,8 @@ fn files(path: &Path) -> Box<Iterator<Item=BufReader<File>>> {
 fn main() {
     const CORPUS_DIR: &'static str = "/home/jamougha/corpus/pg";
     const WORDS: &'static str = "/home/jamougha/corpus/pg/word_counts.csv";
-    //find_most_common_words(CORPUS_DIR, WORDS);
+    let start_time = time::get_time();
+    find_most_common_words(CORPUS_DIR, WORDS);
     let words = load_most_common_words(WORDS, 10000);
     let mut builder = LanguageModelBuilder::new(10, words);
 
@@ -88,7 +97,9 @@ fn main() {
     }
 
     let model = builder.build();
-    println!("Model loaded");
+    let end_time = time::get_time();
+    println!("Model loaded in {}s", end_time.sec - start_time.sec);
+
     loop {
         println!("");
         let input = get_line();
