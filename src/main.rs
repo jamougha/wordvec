@@ -56,14 +56,14 @@ fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item=String>> {
     Box::new(reader.lines()
                    .filter_map(|line| line.ok())
                    .flat_map(|line| {
-                       let words = line.split(|c| match c {
-                                            'a'...'z' => false,
-                                            _ => true,
-                                        })
-                                       .filter(|word| !word.is_empty())
-                                       .map(|word| word.to_string().into_ascii_lowercase())
-                                       .collect::<Vec<_>>();
-                       words.into_iter()
+                       line.split(|c| match c {
+                                'a'...'z' | 'A'...'Z' => false,
+                                _ => true,
+                            })
+                           .filter(|word| !word.is_empty())
+                           .map(|word| word.to_string().into_ascii_lowercase())
+                           .collect::<Vec<_>>()
+                           .into_iter()
                    }))
 }
 
