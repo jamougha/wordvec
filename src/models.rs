@@ -70,7 +70,9 @@ impl WordVec {
     fn rescale(&mut self, vec_scales: &Vec<(f32, f32)>) {
         for i in 0..self.vec.len() {
             let (min, max) = vec_scales[i];
-            self.vec[i] = 2.0 * (self.vec[i] - min) / (max - min) - 1.0;
+            if max != min {
+                self.vec[i] = 2.0 * (self.vec[i] - min) / (max - min) - 1.0;
+            }
         }
     }
 
@@ -167,7 +169,7 @@ impl LanguageModelBuilder {
 
     pub fn build(mut self) -> LanguageModel {
         let len = self.word_vecs[0].vec.len();
-        let mut vec_scales: Vec<(f32, f32)> = repeat((0.0, f32::MAX)).take(len).collect();
+        let mut vec_scales: Vec<(f32, f32)> = repeat((f32::MAX, 0.0)).take(len).collect();
 
         for vec in self.word_vecs.iter_mut() {
             vec.normalize();
@@ -241,7 +243,7 @@ impl LanguageModel {
     pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
         let mut vec_refs = self.word_vecs.iter().filter_map(|w| {
             let dist = w.distance(word);
-            if w.word != word.word && !dist.is_nan() {
+            if w.word != word.word {
                 Some((dist, w))
             } else {
                 None
