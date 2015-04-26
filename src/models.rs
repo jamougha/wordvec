@@ -67,15 +67,6 @@ impl WordVec {
         }
     }
 
-    fn rescale(&mut self, vec_scales: &Vec<(f32, f32)>) {
-        for i in 0..self.vec.len() {
-            let (min, max) = vec_scales[i];
-            if max != min {
-                self.vec[i] = 2.0 * (self.vec[i] - min) / (max - min) - 1.0;
-            }
-        }
-    }
-
     fn inc(&mut self, i: usize) {
         self.vec[i] += 1.0;
     }
@@ -168,22 +159,8 @@ impl LanguageModelBuilder {
     }
 
     pub fn build(mut self) -> LanguageModel {
-        let len = self.word_vecs[0].vec.len();
-        let mut vec_scales: Vec<(f32, f32)> = repeat((f32::MAX, 0.0)).take(len).collect();
-
         for vec in self.word_vecs.iter_mut() {
             vec.normalize();
-        }
-
-        for (i, vec) in self.word_vecs.iter().map(|w| &w.vec).enumerate() {
-            for j in (0..len).filter(|j| i != *j) {
-                let (min, max) = vec_scales[j];
-                vec_scales[j] = (min.min(vec[j]), max.max(vec[j]))
-            }
-        }
-
-        for vec in self.word_vecs.iter_mut() {
-            vec.rescale(&vec_scales);
         }
 
         LanguageModel {
