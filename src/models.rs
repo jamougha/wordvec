@@ -47,7 +47,9 @@ impl WordVec {
     }
 
     pub fn distance(&self, other: &WordVec) -> f32 {
-        self.dot_prod(other) / (self.magnitude() * other.magnitude())
+        self.vec.iter().zip(other.vec.iter())
+                .map(|(x, y)| (x * x - y * y).abs().sqrt())
+                .fold(0.0, |x, y| x + y)
     }
 
     fn new(word: String, num_words: usize) -> WordVec {
