@@ -1,11 +1,11 @@
 use std::ops::{Add, Sub, Div};
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::collections::VecDeque;
 use std::iter::repeat;
 use std::fmt::{Debug, Formatter, Error};
 use std::cmp::Ordering::Equal;
-use std::f32;
+use std::ops::Drop;
+use std::cmp;
 
 #[derive(Clone,)]
 pub struct WordVec {
@@ -129,13 +129,13 @@ pub struct LanguageModel {
 }
 
 pub struct LanguageModelBuilder {
-    window_width: usize,
+    window_radius: usize,
     words: HashMap<String, usize>,
     word_vecs: Vec<WordVec>,
 }
 
 pub struct WordAcceptor<'a> {
-    window: VecDeque<(usize, String)>,
+    sentence: Vec<Option<usize>>,
     builder: &'a mut LanguageModelBuilder,
 }
 
@@ -152,7 +152,7 @@ impl LanguageModelBuilder {
                              .map(|(a, b)| (b, a)));
 
         LanguageModelBuilder {
-            window_width: 2 * window_radius + 1,
+            window_radius: window_radius,
             words: words,
             word_vecs: word_vecs,
         }
@@ -169,9 +169,9 @@ impl LanguageModelBuilder {
         }
     }
 
-    pub fn new_file<'a>(&'a mut self) -> WordAcceptor<'a> {
+    pub fn new_sentence<'a>(&'a mut self) -> WordAcceptor<'a> {
         WordAcceptor {
-            window: VecDeque::new(),
+            sentence: Vec::new(),
             builder: self,
         }
     }
@@ -191,24 +191,41 @@ impl LanguageModelBuilder {
 }
 
 impl<'a> WordAcceptor<'a> {
-    pub fn add_word(&mut self, word: String) {
-        let ww = self.builder.window_width;
-        let idx_opt = self.builder.words.get(&word).map(|w| *w);
+    pub fn add_word(&mut self, word: &str) {
+        let idx_opt = self.builder.words.get(word).map(|w| *w);
 
         if let Some(next_idx) = idx_opt {
-            self.window.push_back((next_idx, word));
-            if self.window.len() > ww {
-                self.window.pop_front();
-            }
+            self.builder.word_vecs[next_idx].count += 1;
+            self.sentence.push(Some(next_idx));
+        }
+        else {
+            self.sentence.push(None);
+        }
+    }
+}
 
-            if self.window.len() == ww {
-                let (center_idx, ref center_word) = self.window[ww / 2];
-                self.builder.word_seen(center_word);
-                for i in (0..ww).filter(|a| *a != ww / 2) {
-                    self.builder.add_word(center_idx, self.window[i].0);
+impl<'a> Drop for WordAcceptor<'a> {
+    fn drop(&mut self) {
+        let WordAcceptor {
+            ref sentence,
+            ref mut builder
+        } = *self;
+
+        println!("{:?}", sentence);
+
+        for (i, &word_idx) in self.sentence.iter().enumerate() {
+            let start = cmp::max(0, i as isize- builder.window_radius as isize) as usize;
+            let end = cmp::min(sentence.len(), i + builder.window_radius + 1);
+            for &j in &sentence[start..end] {
+                match (word_idx, j) {
+                    (Some(w), Some(j)) if w != j =>
+                        builder.word_vecs[w].inc(j),
+                    _ => {},
                 }
             }
         }
+
+        drop(sentence); // not actually sure if this is necessary
     }
 }
 
@@ -231,5 +248,35 @@ impl LanguageModel {
             Equal
         }));
         vec_refs.into_iter().map(|x| x.1).collect()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{WordVec, LanguageModel, LanguageModelBuilder};
+
+    #[test]
+    fn test_accept_sentences() {
+        let words = "foo bar baz blort".words().map(|w| w.to_string()).collect::<Vec<_>>();
+        let mut builder = LanguageModelBuilder::new(1, words);
+
+        let input = "x foo bar baz x x x x x x x blort".words();
+
+        {
+            let mut acc = builder.new_sentence();
+            for word in input {
+                acc.add_word(word);
+            }
+        }
+
+        let model = builder.build();
+        let foo = model.get("foo").unwrap();
+        let baz = model.get("baz").unwrap();
+        let bar = model.get("bar").unwrap();
+        let blort = model.get("blort").unwrap();
+
+        assert!(foo.distance(baz) < foo.distance(blort));
+        assert!(foo.distance(bar) == bar.distance(baz));
+
     }
 }
