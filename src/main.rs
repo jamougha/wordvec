@@ -1,4 +1,5 @@
  #![feature(std_misc)]
+ #![feature(scoped)]
 extern crate time;
 
 mod models;
@@ -12,6 +13,9 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
 use std::ascii::OwnedAsciiExt;
 use models::*;
+use std::thread::Builder;
+use std::sync::mpsc::sync_channel;
+use std::mem::swap;
 
 fn get_line() -> String {
     let mut stdin = stdin();
@@ -52,6 +56,14 @@ fn load_most_common_words(filename: &str, num: usize) -> Vec<String> {
     .collect()
 }
 
+fn sentences<T: Read + 'static>(reader: BufReader<T>) -> Box<Iterator<Item=String>> {
+    Box::new(reader.split('.' as u8)
+                   .filter_map(|v| {
+                        let lowercase = v.unwrap().into_ascii_lowercase();
+                        String::from_utf8(lowercase).ok()
+                    }))
+}
+
 fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item=String>> {
     Box::new(reader.lines()
                    .filter_map(|line| line.ok())
@@ -83,22 +95,56 @@ fn main() {
     const CORPUS_DIR: &'static str = "/home/jamougha/corpus/pg";
     const WORDS: &'static str = "/home/jamougha/corpus/pg/word_counts.csv";
     let start_time = time::get_time();
-    find_most_common_words(CORPUS_DIR, WORDS);
-    let words = load_most_common_words(WORDS, 10000);
+    // find_most_common_words(CORPUS_DIR, WORDS);
+    let words = load_most_common_words(WORDS, 30000);
     let mut builder = LanguageModelBuilder::new(10, words);
 
     let path = Path::new(CORPUS_DIR);
 
-    for file in files(path) {
-        let mut acc = builder.new_file();
-        for word in read_words(file) {
-            acc.add_word(word);
+    let num_words = &mut 0;
+
+
+    let (tx, rx) = sync_channel::<Option<Vec<String>>>(100);
+
+    let guard = Builder::new().scoped(move || {
+        while let Some(sentences) = rx.recv().unwrap() {
+            for sentence in sentences {
+                let mut acc = builder.new_sentence();
+                for word in sentence.split(|c| match c {
+                    'a'...'z' => false,
+                    _ => true,
+                }).filter(|w| !w.is_empty())
+                {
+                    *num_words += 1;
+                    acc.add_word(word);
+                    if *num_words % 10_000_000 == 0 {
+                        println!("Loaded {} million words in {} seconds", *num_words / 1_000_000, time::get_time().sec - start_time.sec);
+                    }
+                }
+            }
+        }
+
+        builder.build()
+    }).unwrap();
+
+    let mut chapter = Vec::with_capacity(100);
+    for sentence in files(path).flat_map(sentences) {
+        chapter.push(sentence);
+        if chapter.len() == chapter.capacity() {
+            let mut next = Vec::with_capacity(100);
+            swap(&mut chapter, &mut next);
+            tx.send(Some(next)).unwrap();
         }
     }
 
-    let model = builder.build();
+
+    tx.send(None).unwrap();
+
+    let model = guard.join();
     let end_time = time::get_time();
     println!("Model loaded in {}s", end_time.sec - start_time.sec);
+
+
 
     loop {
         println!("");

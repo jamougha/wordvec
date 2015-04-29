@@ -266,10 +266,10 @@ mod test {
         let mut builder = LanguageModelBuilder::new(1, words);
 
         {
-            let mut acc = builder.new_file();
+            let mut acc = builder.new_sentence();
             let text = "x x a a b a c b x x";
             for word in text.split(' ') {
-                acc.add_word(word.to_string());
+                acc.add_word(word);
             }
         }
 
