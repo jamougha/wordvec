@@ -48,8 +48,9 @@ impl WordVec {
 
     pub fn distance(&self, other: &WordVec) -> f32 {
         self.vec.iter().zip(other.vec.iter())
-                .map(|(x, y)| (x * x - y * y).abs().sqrt())
+                .map(|(x, y)| (x - y)*(x - y))
                 .fold(0.0, |x, y| x + y)
+                .abs().sqrt()
     }
 
     fn new(word: String, num_words: usize) -> WordVec {
@@ -176,17 +177,8 @@ impl LanguageModelBuilder {
         }
     }
 
-    fn get_vec(&mut self, word: &str) -> &mut WordVec {
-        let i = self.words[word];
-        &mut self.word_vecs[i]
-    }
-
-    fn add_word(&mut self, from: usize, to: usize) {
-        self.word_vecs[from].inc(to);
-    }
-
-    fn word_seen(&mut self, word: &str) {
-        self.get_vec(word).count += 1;
+    fn word_seen(&mut self, word: usize) {
+        self.word_vecs[word].count += 1;
     }
 }
 
@@ -195,7 +187,7 @@ impl<'a> WordAcceptor<'a> {
         let idx_opt = self.builder.words.get(word).map(|w| *w);
 
         if let Some(next_idx) = idx_opt {
-            self.builder.word_vecs[next_idx].count += 1;
+            self.builder.word_seen(next_idx);
             self.sentence.push(Some(next_idx));
         }
         else {
@@ -210,8 +202,6 @@ impl<'a> Drop for WordAcceptor<'a> {
             ref sentence,
             ref mut builder
         } = *self;
-
-        println!("{:?}", sentence);
 
         for (i, &word_idx) in self.sentence.iter().enumerate() {
             let start = cmp::max(0, i as isize- builder.window_radius as isize) as usize;
