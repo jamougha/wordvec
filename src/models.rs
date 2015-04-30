@@ -50,7 +50,7 @@ impl WordVec {
         self.vec.iter().zip(other.vec.iter())
                 .map(|(x, y)| (x - y)*(x - y))
                 .fold(0.0, |x, y| x + y)
-                .abs().sqrt()
+                .sqrt()
     }
 
     fn new(word: String, num_words: usize) -> WordVec {
