@@ -133,10 +133,10 @@ pub struct LanguageModelBuilder {
     window_radius: usize,
     words: HashMap<String, usize>,
     word_vecs: Vec<WordVec>,
+    sentence: Vec<Option<usize>>,
 }
 
 pub struct WordAcceptor<'a> {
-    sentence: Vec<Option<usize>>,
     builder: &'a mut LanguageModelBuilder,
 }
 
@@ -156,6 +156,7 @@ impl LanguageModelBuilder {
             window_radius: window_radius,
             words: words,
             word_vecs: word_vecs,
+            sentence: vec![],
         }
     }
 
@@ -172,7 +173,6 @@ impl LanguageModelBuilder {
 
     pub fn new_sentence<'a>(&'a mut self) -> WordAcceptor<'a> {
         WordAcceptor {
-            sentence: Vec::new(),
             builder: self,
         }
     }
@@ -188,34 +188,36 @@ impl<'a> WordAcceptor<'a> {
 
         if let Some(next_idx) = idx_opt {
             self.builder.word_seen(next_idx);
-            self.sentence.push(Some(next_idx));
+            self.builder.sentence.push(Some(next_idx));
         }
         else {
-            self.sentence.push(None);
+            self.builder.sentence.push(None);
         }
     }
 }
 
 impl<'a> Drop for WordAcceptor<'a> {
     fn drop(&mut self) {
-        let WordAcceptor {
-            ref sentence,
-            ref mut builder
-        } = *self;
+        let LanguageModelBuilder {
+            ref mut sentence,
+            ref mut word_vecs,
+            window_radius,
+            ..
+        } = *self.builder;
 
-        for (i, &word_idx) in self.sentence.iter().enumerate() {
-            let start = cmp::max(0, i as isize- builder.window_radius as isize) as usize;
-            let end = cmp::min(sentence.len(), i + builder.window_radius + 1);
+        for (i, &word_idx) in sentence.iter().enumerate() {
+            let start = cmp::max(0, i as isize - window_radius as isize) as usize;
+            let end = cmp::min(sentence.len(), i + window_radius + 1);
             for &j in &sentence[start..end] {
                 match (word_idx, j) {
                     (Some(w), Some(j)) if w != j =>
-                        builder.word_vecs[w].inc(j),
+                        word_vecs[w].inc(j),
                     _ => {},
                 }
             }
         }
 
-        drop(sentence); // not actually sure if this is necessary
+        sentence.clear();
     }
 }
 

@@ -1,4 +1,5 @@
  #![feature(std_misc)]
+ #![feature(str_words)]
  #![feature(scoped)]
 extern crate time;
 
@@ -101,46 +102,25 @@ fn main() {
 
     let path = Path::new(CORPUS_DIR);
 
-    let num_words = &mut 0;
+    let mut num_words = 0;
 
-
-    let (tx, rx) = sync_channel::<Option<Vec<String>>>(100);
-
-    let guard = Builder::new().scoped(move || {
-        while let Some(sentences) = rx.recv().unwrap() {
-            for sentence in sentences {
-                let mut acc = builder.new_sentence();
-                for word in sentence.split(|c| match c {
-                    'a'...'z' => false,
-                    _ => true,
-                }).filter(|w| !w.is_empty())
-                {
-                    *num_words += 1;
-                    acc.add_word(word);
-                    if *num_words % 10_000_000 == 0 {
-                        println!("Loaded {} million words in {} seconds", *num_words / 1_000_000, time::get_time().sec - start_time.sec);
-                    }
-                }
-            }
-        }
-
-        builder.build()
-    }).unwrap();
-
-    let mut chapter = Vec::with_capacity(100);
     for sentence in files(path).flat_map(sentences) {
-        chapter.push(sentence);
-        if chapter.len() == chapter.capacity() {
-            let mut next = Vec::with_capacity(100);
-            swap(&mut chapter, &mut next);
-            tx.send(Some(next)).unwrap();
+        let mut acc = builder.new_sentence();
+        for word in sentence.split(|c| match c {
+            'a'...'z' => false,
+            _ => true,
+        }).filter(|w| !w.is_empty())
+        {
+            *num_words += 1;
+            acc.add_word(word);
+            if num_words % 10_000_000 == 0 {
+                println!("Loaded {} million words in {} seconds", num_words / 1_000_000, time::get_time().sec - start_time.sec);
+            }
         }
     }
 
 
-    tx.send(None).unwrap();
-
-    let model = guard.join();
+    let model = builder.build();
     let end_time = time::get_time();
     println!("Model loaded in {}s", end_time.sec - start_time.sec);
 
