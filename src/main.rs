@@ -57,7 +57,7 @@ fn load_most_common_words(filename: &str, num: usize) -> Vec<String> {
     .collect()
 }
 
-fn sentences<T: Read + 'static>(reader: BufReader<T>) -> Box<Iterator<Item=String>> {
+fn sentences<T: Read + 'static>(reader: BufReader<T>) -> Box<Iterator<Item = String>> {
     Box::new(reader.split('.' as u8)
                    .filter_map(|v| {
                         let lowercase = v.unwrap().into_ascii_lowercase();
@@ -65,7 +65,7 @@ fn sentences<T: Read + 'static>(reader: BufReader<T>) -> Box<Iterator<Item=Strin
                     }))
 }
 
-fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item=String>> {
+fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item = String>> {
     Box::new(reader.lines()
                    .filter_map(|line| line.ok())
                    .flat_map(|line| {
@@ -80,9 +80,8 @@ fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item=String>> {
                    }))
 }
 
-fn files(path: &Path) -> Box<Iterator<Item=BufReader<File>>> {
-    Box::new(
-        read_dir(path)
+fn files(path: &Path) -> Box<Iterator<Item = BufReader<File>>> {
+    Box::new(read_dir(path)
             .unwrap()
             .map(|path| path.unwrap().path())
             .filter(|path| path.to_str().unwrap().ends_with(".txt"))
@@ -111,10 +110,12 @@ fn main() {
             _ => true,
         }).filter(|w| !w.is_empty())
         {
-            *num_words += 1;
+            num_words += 1;
             acc.add_word(word);
             if num_words % 10_000_000 == 0 {
-                println!("Loaded {} million words in {} seconds", num_words / 1_000_000, time::get_time().sec - start_time.sec);
+                println!("Loaded {} million words in {} seconds",
+                         num_words / 1_000_000,
+                         time::get_time().sec - start_time.sec);
             }
         }
     }
