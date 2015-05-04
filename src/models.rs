@@ -6,8 +6,12 @@ use std::fmt::{Debug, Formatter, Error};
 use std::cmp::Ordering::Equal;
 use std::ops::Drop;
 use std::cmp;
+use std::path::Path;
+use std::io::{BufWriter, Write, BufReader, Read, BufRead};
+use std::fs::File;
+use std::mem;
 
-#[derive(Clone,)]
+#[derive(Clone)]
 pub struct WordVec {
     pub word: String,
     pub count: u64,
@@ -124,6 +128,7 @@ impl<'a> Sub<&'a WordVec> for WordVec {
     }
 }
 
+#[derive(Clone, PartialEq, Debug)]
 pub struct LanguageModel {
     words: HashMap<String, usize>,
     word_vecs: Vec<WordVec>,
@@ -241,14 +246,106 @@ impl LanguageModel {
         }));
         vec_refs.into_iter().map(|x| x.1).collect()
     }
+
+    pub fn save(&self, path: &Path) {
+        let mut file = BufWriter::new(File::create(path).unwrap());
+
+        write_raw(self.word_vecs.len(), &mut file);
+        file.write(&[b'\n']);
+
+        for vec in &self.word_vecs {
+            file.write(vec.word.as_bytes());
+            file.write(&[b':']);
+            let count = vec.count;
+            write_raw(count, &mut file);
+            for f in &vec.vec {
+                write_raw(*f, &mut file)
+            }
+            file.write(&[b'\n']);
+        }
+
+    }
+
+    pub fn load(path: &Path) -> LanguageModel {
+        let mut file = BufReader::new(File::open(path).unwrap());
+        let mut word_vecs = Vec::new();
+
+        let size: u64 = read_raw(&mut file);
+        read_byte(b'\n', &mut file);
+
+        for i in 0..size {
+            let mut word: Vec<u8> = Vec::new();
+            file.read_until(b':', &mut word);
+            assert_eq!(Some(b':'), word.pop());
+            let word = String::from_utf8(word).unwrap();
+
+            let count: u64 = read_raw(&mut file);
+
+            let mut vec: Vec<f32> = repeat(0f32).take(size as usize).collect();
+            for f in &mut vec {
+                *f = read_raw(&mut file);
+            }
+
+            read_byte(b'\n', &mut file);
+
+            word_vecs.push(WordVec {
+                word: word,
+                count: count,
+                vec: vec,
+            });
+        }
+
+        let words: HashMap<_, _> = word_vecs.iter()
+                                            .map(|v| v.word.clone())
+                                            .enumerate()
+                                            .map(|(i, w)| (w, i))
+                                            .collect();
+
+        LanguageModel {
+            words: words,
+            word_vecs: word_vecs,
+        }
+    }
+}
+
+fn read_byte<R: Read>(b: u8, read: &mut R) {
+    let buf = &mut [0];
+    read.read(buf);
+    assert_eq!(&[b'\n'], buf);
+}
+
+fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> T {
+    let mut buffer = [0u8; 64];
+    let t_size = mem::size_of::<T>();
+    assert!(t_size <= buffer.len());
+
+    let size = reader.read(&mut buffer[0..t_size]).unwrap();
+    assert_eq!(t_size, size);
+
+    unsafe {
+        let bptr: *mut T = mem::transmute((&buffer).as_ptr());
+        *bptr
+    }
+}
+
+fn write_raw<T: Copy, F: Write>(t: T, writer: &mut BufWriter<F>) {
+    let mut buffer = [0u8; 64];
+    let t_size = mem::size_of::<T>();
+    assert!(t_size <= buffer.len());
+    unsafe {
+        let bptr: *mut T = mem::transmute((&buffer).as_ptr());
+        *bptr = t;
+    }
+
+    writer.write(&buffer[0..t_size]);
 }
 
 #[cfg(test)]
 mod test {
     use super::{WordVec, LanguageModel, LanguageModelBuilder};
+    use std::path::Path;
 
-    #[test]
-    fn test_accept_sentences() {
+    fn get_model() -> LanguageModel {
         let words = "foo bar baz blort".words().map(|w| w.to_string()).collect::<Vec<_>>();
         let mut builder = LanguageModelBuilder::new(1, words);
 
@@ -261,7 +358,12 @@ mod test {
             }
         }
 
-        let model = builder.build();
+        builder.build()
+    }
+
+    #[test]
+    fn test_accept_sentences() {
+        let model = get_model();
         let foo = model.get("foo").unwrap();
         let baz = model.get("baz").unwrap();
         let bar = model.get("bar").unwrap();
@@ -269,6 +371,15 @@ mod test {
 
         assert!(foo.distance(baz) < foo.distance(blort));
         assert!(foo.distance(bar) == bar.distance(baz));
+    }
 
+    #[test]
+    fn test_serialization() {
+        let model = get_model();
+        let path = Path::new("/tmp/model.data");
+        model.save(&path);
+
+        let loaded_model = LanguageModel::load(path);
+        assert_eq!(model, loaded_model);
     }
 }
