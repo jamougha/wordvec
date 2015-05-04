@@ -251,17 +251,17 @@ impl LanguageModel {
         let mut file = BufWriter::new(File::create(path).unwrap());
 
         write_raw(self.word_vecs.len(), &mut file);
-        file.write(&[b'\n']);
+        file.write(&[b'\n']).unwrap();
 
         for vec in &self.word_vecs {
-            file.write(vec.word.as_bytes());
-            file.write(&[b':']);
+            file.write(vec.word.as_bytes()).unwrap();
+            file.write(&[b':']).unwrap();
             let count = vec.count;
             write_raw(count, &mut file);
             for f in &vec.vec {
                 write_raw(*f, &mut file)
             }
-            file.write(&[b'\n']);
+            file.write(&[b'\n']).unwrap();
         }
 
     }
@@ -273,9 +273,9 @@ impl LanguageModel {
         let size: u64 = read_raw(&mut file);
         read_byte(b'\n', &mut file);
 
-        for i in 0..size {
+        for _ in 0..size {
             let mut word: Vec<u8> = Vec::new();
-            file.read_until(b':', &mut word);
+            file.read_until(b':', &mut word).unwrap();
             assert_eq!(Some(b':'), word.pop());
             let word = String::from_utf8(word).unwrap();
 
@@ -310,8 +310,8 @@ impl LanguageModel {
 
 fn read_byte<R: Read>(b: u8, read: &mut R) {
     let buf = &mut [0];
-    read.read(buf);
-    assert_eq!(&[b'\n'], buf);
+    read.read(buf).unwrap();
+    assert_eq!(&[b], buf);
 }
 
 fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> T {
