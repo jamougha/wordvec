@@ -281,7 +281,7 @@ impl LanguageModel {
             let count: u64 = unsafe { read_raw::<u64, _>(&mut file) };
 
             let mut vec: Vec<f32> = repeat(0f32).take(size as usize).collect();
-            for f in &mut vec{
+            for f in &mut vec {
                 unsafe {
                     *f = read_raw::<f32, _>(&mut file);
                 }
@@ -311,7 +311,7 @@ impl LanguageModel {
 
 fn read_byte<R: Read>(b: u8, read: &mut R) {
     let buf = &mut [0];
-    read.read(buf).unwrap();
+    while read.read(buf).unwrap() == 0 {}
     assert_eq!(&[b], buf);
 }
 
@@ -325,13 +325,9 @@ unsafe fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> T {
         let bytes_read = reader.read(&mut buffer[(t_size-remainder)..t_size]).unwrap();
         remainder -= bytes_read;
     }
-    // println!("{:?}", &buffer[..]);
-    // assert_eq!(t_size, size);
 
-    unsafe {
-        let bptr: *mut T = mem::transmute((&buffer).as_ptr());
-        *bptr
-    }
+    let bptr: *mut T = mem::transmute((&buffer).as_ptr());
+    *bptr
 }
 
 fn write_raw<T: Copy, F: Write>(t: T, writer: &mut BufWriter<F>) {
