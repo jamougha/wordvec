@@ -270,7 +270,7 @@ impl LanguageModel {
         let mut file = BufReader::new(File::open(path).unwrap());
         let mut word_vecs = Vec::new();
 
-        let size: u64 = read_raw(&mut file);
+        let size: u64 = unsafe { read_raw::<u64, _>(&mut file) };
         read_byte(b'\n', &mut file);
 
         for _ in 0..size {
@@ -278,12 +278,13 @@ impl LanguageModel {
             file.read_until(b':', &mut word).unwrap();
             assert_eq!(Some(b':'), word.pop());
             let word = String::from_utf8(word).unwrap();
-
-            let count: u64 = read_raw(&mut file);
+            let count: u64 = unsafe { read_raw::<u64, _>(&mut file) };
 
             let mut vec: Vec<f32> = repeat(0f32).take(size as usize).collect();
-            for f in &mut vec {
-                *f = read_raw(&mut file);
+            for f in &mut vec{
+                unsafe {
+                    *f = read_raw::<f32, _>(&mut file);
+                }
             }
 
             read_byte(b'\n', &mut file);
@@ -314,13 +315,18 @@ fn read_byte<R: Read>(b: u8, read: &mut R) {
     assert_eq!(&[b], buf);
 }
 
-fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> T {
+unsafe fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> T {
     let mut buffer = [0u8; 64];
     let t_size = mem::size_of::<T>();
     assert!(t_size <= buffer.len());
 
-    let size = reader.read(&mut buffer[0..t_size]).unwrap();
-    assert_eq!(t_size, size);
+    let mut remainder = t_size;
+    while remainder > 0 {
+        let bytes_read = reader.read(&mut buffer[(t_size-remainder)..t_size]).unwrap();
+        remainder -= bytes_read;
+    }
+    // println!("{:?}", &buffer[..]);
+    // assert_eq!(t_size, size);
 
     unsafe {
         let bptr: *mut T = mem::transmute((&buffer).as_ptr());
