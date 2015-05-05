@@ -185,6 +185,69 @@ impl LanguageModelBuilder {
     fn word_seen(&mut self, word: usize) {
         self.word_vecs[word].count += 1;
     }
+
+    pub fn save(&self, path: &Path) {
+        let mut file = BufWriter::new(File::create(path).unwrap());
+
+        write_raw(self.word_vecs.len(), &mut file);
+        file.write(&[b'\n']).unwrap();
+
+        for vec in &self.word_vecs {
+            file.write(vec.word.as_bytes()).unwrap();
+            file.write(&[b':']).unwrap();
+            let count = vec.count;
+            write_raw(count, &mut file);
+            for f in &vec.vec {
+                write_raw(*f, &mut file)
+            }
+            file.write(&[b'\n']).unwrap();
+        }
+
+    }
+
+    pub fn load(path: &Path) -> LanguageModelBuilder {
+        let mut file = BufReader::new(File::open(path).unwrap());
+        let mut word_vecs = Vec::new();
+
+        let size: u64 = unsafe { read_raw::<u64, _>(&mut file) };
+        read_byte(b'\n', &mut file);
+
+        for _ in 0..size {
+            let mut word: Vec<u8> = Vec::new();
+            file.read_until(b':', &mut word).unwrap();
+            assert_eq!(Some(b':'), word.pop());
+            let word = String::from_utf8(word).unwrap();
+            let count: u64 = unsafe { read_raw::<u64, _>(&mut file) };
+
+            let mut vec: Vec<f32> = repeat(0f32).take(size as usize).collect();
+            for f in &mut vec {
+                unsafe {
+                    *f = read_raw::<f32, _>(&mut file);
+                }
+            }
+
+            read_byte(b'\n', &mut file);
+
+            word_vecs.push(WordVec {
+                word: word,
+                count: count,
+                vec: vec,
+            });
+        }
+
+        let words: HashMap<_, _> = word_vecs.iter()
+                                            .map(|v| v.word.clone())
+                                            .enumerate()
+                                            .map(|(i, w)| (w, i))
+                                            .collect();
+
+        LanguageModelBuilder {
+            window_radius: 0,
+            words: words,
+            word_vecs: word_vecs,
+            sentence: Vec::new(),
+        }
+    }
 }
 
 impl<'a> WordAcceptor<'a> {
@@ -247,66 +310,6 @@ impl LanguageModel {
         vec_refs.into_iter().map(|x| x.1).collect()
     }
 
-    pub fn save(&self, path: &Path) {
-        let mut file = BufWriter::new(File::create(path).unwrap());
-
-        write_raw(self.word_vecs.len(), &mut file);
-        file.write(&[b'\n']).unwrap();
-
-        for vec in &self.word_vecs {
-            file.write(vec.word.as_bytes()).unwrap();
-            file.write(&[b':']).unwrap();
-            let count = vec.count;
-            write_raw(count, &mut file);
-            for f in &vec.vec {
-                write_raw(*f, &mut file)
-            }
-            file.write(&[b'\n']).unwrap();
-        }
-
-    }
-
-    pub fn load(path: &Path) -> LanguageModel {
-        let mut file = BufReader::new(File::open(path).unwrap());
-        let mut word_vecs = Vec::new();
-
-        let size: u64 = unsafe { read_raw::<u64, _>(&mut file) };
-        read_byte(b'\n', &mut file);
-
-        for _ in 0..size {
-            let mut word: Vec<u8> = Vec::new();
-            file.read_until(b':', &mut word).unwrap();
-            assert_eq!(Some(b':'), word.pop());
-            let word = String::from_utf8(word).unwrap();
-            let count: u64 = unsafe { read_raw::<u64, _>(&mut file) };
-
-            let mut vec: Vec<f32> = repeat(0f32).take(size as usize).collect();
-            for f in &mut vec {
-                unsafe {
-                    *f = read_raw::<f32, _>(&mut file);
-                }
-            }
-
-            read_byte(b'\n', &mut file);
-
-            word_vecs.push(WordVec {
-                word: word,
-                count: count,
-                vec: vec,
-            });
-        }
-
-        let words: HashMap<_, _> = word_vecs.iter()
-                                            .map(|v| v.word.clone())
-                                            .enumerate()
-                                            .map(|(i, w)| (w, i))
-                                            .collect();
-
-        LanguageModel {
-            words: words,
-            word_vecs: word_vecs,
-        }
-    }
 }
 
 fn read_byte<R: Read>(b: u8, read: &mut R) {
@@ -347,7 +350,7 @@ mod test {
     use super::{WordVec, LanguageModel, LanguageModelBuilder};
     use std::path::Path;
 
-    fn get_model() -> LanguageModel {
+    fn get_builder() -> LanguageModelBuilder {
         let words = "foo bar baz blort".words().map(|w| w.to_string()).collect::<Vec<_>>();
         let mut builder = LanguageModelBuilder::new(1, words);
 
@@ -360,12 +363,12 @@ mod test {
             }
         }
 
-        builder.build()
+        builder
     }
 
     #[test]
     fn test_accept_sentences() {
-        let model = get_model();
+        let model = get_builder().build();
         let foo = model.get("foo").unwrap();
         let baz = model.get("baz").unwrap();
         let bar = model.get("bar").unwrap();
@@ -377,11 +380,11 @@ mod test {
 
     #[test]
     fn test_serialization() {
-        let model = get_model();
+        let builder = get_builder();
         let path = Path::new("/tmp/model.data");
-        model.save(&path);
+        builder.save(&path);
 
-        let loaded_model = LanguageModel::load(path);
-        assert_eq!(model, loaded_model);
+        let loaded_model = LanguageModelBuilder::load(path).build();
+        assert_eq!(builder.build(), loaded_model);
     }
 }

@@ -1,6 +1,4 @@
  #![feature(std_misc)]
- #![feature(str_words)]
- #![feature(scoped)]
 extern crate time;
 
 mod models;
@@ -14,9 +12,6 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
 use std::ascii::OwnedAsciiExt;
 use models::*;
-use std::thread::Builder;
-use std::sync::mpsc::sync_channel;
-use std::mem::swap;
 
 fn get_line() -> String {
     let mut stdin = stdin();
@@ -95,15 +90,15 @@ fn create_model(path: &Path) {
     const CORPUS_DIR: &'static str = "/home/jamougha/corpus/pg";
     const WORDS: &'static str = "/home/jamougha/corpus/pg/word_counts.csv";
     let start_time = time::get_time();
-    find_most_common_words(CORPUS_DIR, WORDS);
+    // find_most_common_words(CORPUS_DIR, WORDS);
     let words = load_most_common_words(WORDS, 30000);
     let mut builder = LanguageModelBuilder::new(10, words);
 
-    let path = Path::new(CORPUS_DIR);
+    let corpus_path = Path::new(CORPUS_DIR);
 
     let mut num_words = 0;
 
-    for sentence in files(path).flat_map(sentences) {
+    for sentence in files(corpus_path).flat_map(sentences) {
         let mut acc = builder.new_sentence();
         for word in sentence.split(|c| match c {
             'a'...'z' => false,
@@ -120,17 +115,17 @@ fn create_model(path: &Path) {
         }
     }
 
-
-    let model = builder.build();
-    model.save(path);
+    builder.save(path);
     let end_time = time::get_time();
     println!("Model built in {}s", end_time.sec - start_time.sec);
 }
 
 fn main() {
     let path = Path::new("/home/jamougha/corpus/pg/model.data");
+    create_model(&path);
     let start_time = time::get_time();
-    let model = LanguageModel::load(&path);
+    let builder = LanguageModelBuilder::load(&path);
+    let model = builder.build();
     let end_time = time::get_time();
     println!("Model loaded in {}s", start_time.sec - end_time.sec);
 
