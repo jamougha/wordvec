@@ -335,7 +335,7 @@ unsafe fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> T {
         remainder -= bytes_read;
     }
 
-    let bptr: *mut T = mem::transmute((&buffer).as_ptr());
+    let bptr: *mut T = mem::transmute(buffer.as_ptr());
     *bptr
 }
 
@@ -344,7 +344,7 @@ fn write_raw<T: Copy, F: Write>(t: T, writer: &mut BufWriter<F>) {
     let t_size = mem::size_of::<T>();
     assert!(t_size <= buffer.len());
     unsafe {
-        let bptr: *mut T = mem::transmute((&buffer).as_ptr());
+        let bptr: *mut T = mem::transmute(buffer.as_ptr());
         *bptr = t;
     }
 
@@ -357,10 +357,10 @@ mod test {
     use std::path::Path;
 
     fn get_builder() -> LanguageModelBuilder {
-        let words = "foo bar baz blort".words().map(|w| w.to_string()).collect::<Vec<_>>();
+        let words = "foo bar baz blort".split(" ").map(|w| w.to_string()).collect::<Vec<_>>();
         let mut builder = LanguageModelBuilder::new(1, words);
 
-        let input = "x foo bar baz x x x x x x x blort".words();
+        let input = "x foo bar baz x x x x x x x blort".split(" ");
 
         {
             let mut acc = builder.new_sentence();
