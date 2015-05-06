@@ -122,12 +122,11 @@ fn create_model(path: &Path) {
 
 fn main() {
     let path = Path::new("/home/jamougha/corpus/pg/model.data");
-    create_model(&path);
+    // create_model(&path);
     let start_time = time::get_time();
     let builder = LanguageModelBuilder::load(&path);
     let model = builder.build();
-    let end_time = time::get_time();
-    println!("Model loaded in {}s", start_time.sec - end_time.sec);
+    println!("Model loaded in {}s", time::get_time().sec - start_time.sec);
 
     loop {
         println!("");
