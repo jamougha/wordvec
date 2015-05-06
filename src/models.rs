@@ -173,7 +173,7 @@ impl LanguageModelBuilder {
         }
 
         for (vec, c) in self.word_vecs.iter_mut().zip(cooccurences.iter()) {
-            vec.normalize(*c);
+            vec.normalize(c.max(1.0));
         }
 
         LanguageModel {
