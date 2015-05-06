@@ -65,10 +65,9 @@ impl WordVec {
         }
     }
 
-    fn normalize(&mut self) {
-        let count = self.count as f32;
+    fn normalize(&mut self, cooccurences: f32) {
         for f in &mut self.vec {
-            *f /= count;
+            *f /= cooccurences;
         }
     }
 
@@ -166,8 +165,15 @@ impl LanguageModelBuilder {
     }
 
     pub fn build(mut self) -> LanguageModel {
-        for vec in self.word_vecs.iter_mut() {
-            vec.normalize();
+        let mut cooccurences: Vec<f32> = repeat(0.0).take(self.word_vecs.len()).collect();
+        for vec in &self.word_vecs {
+            for (count, x) in cooccurences.iter_mut().zip(vec.vec.iter()) {
+                *count += *x;
+            }
+        }
+
+        for (vec, c) in self.word_vecs.iter_mut().zip(cooccurences.iter()) {
+            vec.normalize(*c);
         }
 
         LanguageModel {
