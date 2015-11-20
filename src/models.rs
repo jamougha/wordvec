@@ -14,7 +14,6 @@ use std::mem;
 #[derive(Clone)]
 pub struct WordVec {
     pub word: String,
-    pub count: u64,
     vec: Vec<f32>,
 }
 
@@ -28,7 +27,6 @@ impl Debug for WordVec {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         try!(self.word.fmt(fmt));
         try!(fmt.write_str(": "));
-        try!(self.count.fmt(fmt));
         try!(fmt.write_str(", "));
         self.vec.iter().take(5).collect::<Vec<_>>().fmt(fmt)
     }
@@ -60,19 +58,24 @@ impl WordVec {
     fn new(word: String, num_words: usize) -> WordVec {
         WordVec {
             word: word,
-            count: 0,
             vec: repeat(0.0).take(num_words).collect(),
         }
     }
 
-    fn normalize(&mut self, cooccurences: f32) {
+    fn normalize(&mut self) {
+        let cooccurences = self.vec.iter().fold(0f32, |x, y| {
+            assert!(!y.is_nan());
+            x + *y
+        });
+
         for f in &mut self.vec {
-            *f /= cooccurences;
+            *f /= cooccurences + 1.0;
         }
     }
 
-    fn inc(&mut self, i: usize) {
-        self.vec[i] += 1.0;
+    fn inc(&mut self, i: usize, dist: usize) {
+        assert!(dist != 0);
+        self.vec[i] += 1.0 / dist as f32;
     }
 
 }
@@ -96,7 +99,6 @@ impl<'a> Add<&'a WordVec> for WordVec {
         debug_assert!(self.vec.len() == other.vec.len());
         let mut newvec = WordVec {
             word: format!("{} + {}", &self.word, &other.word),
-            count: 0,
             vec: self.vec,
         };
 
@@ -115,7 +117,6 @@ impl<'a> Sub<&'a WordVec> for WordVec {
         debug_assert!(self.vec.len() == other.vec.len());
         let mut newvec = WordVec {
             word: format!("{} - {}", &self.word, &other.word),
-            count: 0,
             vec: self.vec,
         };
 
@@ -165,15 +166,8 @@ impl LanguageModelBuilder {
     }
 
     pub fn build(mut self) -> LanguageModel {
-        let mut cooccurences: Vec<f32> = repeat(0.0).take(self.word_vecs.len()).collect();
-        for vec in &self.word_vecs {
-            for (count, x) in cooccurences.iter_mut().zip(vec.vec.iter()) {
-                *count += *x;
-            }
-        }
-
-        for (vec, c) in self.word_vecs.iter_mut().zip(cooccurences.iter()) {
-            vec.normalize(c.max(1.0));
+        for vec in self.word_vecs.iter_mut() {
+            vec.normalize();
         }
 
         LanguageModel {
@@ -188,10 +182,6 @@ impl LanguageModelBuilder {
         }
     }
 
-    fn word_seen(&mut self, word: usize) {
-        self.word_vecs[word].count += 1;
-    }
-
     pub fn save(&self, path: &Path) {
         let mut file = BufWriter::new(File::create(path).unwrap());
 
@@ -201,8 +191,6 @@ impl LanguageModelBuilder {
         for vec in &self.word_vecs {
             file.write(vec.word.as_bytes()).unwrap();
             file.write(&[b':']).unwrap();
-            let count = vec.count;
-            write_raw(count, &mut file);
             for f in &vec.vec {
                 write_raw(*f, &mut file)
             }
@@ -223,7 +211,6 @@ impl LanguageModelBuilder {
             file.read_until(b':', &mut word).unwrap();
             assert_eq!(Some(b':'), word.pop());
             let word = String::from_utf8(word).unwrap();
-            let count: u64 = unsafe { read_raw::<u64, _>(&mut file) };
 
             let mut vec: Vec<f32> = repeat(0f32).take(size as usize).collect();
             for f in &mut vec {
@@ -236,7 +223,6 @@ impl LanguageModelBuilder {
 
             word_vecs.push(WordVec {
                 word: word,
-                count: count,
                 vec: vec,
             });
         }
@@ -260,13 +246,7 @@ impl<'a> WordAcceptor<'a> {
     pub fn add_word(&mut self, word: &str) {
         let idx_opt = self.builder.words.get(word).map(|w| *w);
 
-        if let Some(next_idx) = idx_opt {
-            self.builder.word_seen(next_idx);
-            self.builder.sentence.push(Some(next_idx));
-        }
-        else {
-            self.builder.sentence.push(None);
-        }
+        self.builder.sentence.push(idx_opt);
     }
 }
 
@@ -279,14 +259,14 @@ impl<'a> Drop for WordAcceptor<'a> {
             ..
         } = *self.builder;
 
-        for (i, &word_idx) in sentence.iter().enumerate() {
+        for (i, &from_word) in sentence.iter().enumerate() {
             let start = cmp::max(0, i as isize - window_radius as isize) as usize;
             let end = cmp::min(sentence.len(), i + window_radius + 1);
-            for &j in &sentence[start..end] {
-                match (word_idx, j) {
-                    (Some(w), Some(j)) if w != j =>
-                        word_vecs[w].inc(j),
-                    _ => {},
+            for j in (start..i).chain(i + 1..end) {
+                let dist = cmp::max(i, j) - cmp::min(i, j);
+
+                if let (Some(f), Some(t)) = (from_word, sentence[j]) {
+                    word_vecs[f].inc(t, dist);
                 }
             }
         }
