@@ -10,7 +10,6 @@ use std::io::{BufReader, BufRead, Read, Write, stdin};
 use std::path::{Path};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
-use std::ascii::OwnedAsciiExt;
 use models::*;
 
 fn get_line() -> String {
@@ -55,8 +54,8 @@ fn load_most_common_words(filename: &str, num: usize) -> Vec<String> {
 fn sentences<T: Read + 'static>(reader: BufReader<T>) -> Box<Iterator<Item = String>> {
     Box::new(reader.split('.' as u8)
                    .filter_map(|v| {
-                        let lowercase = v.unwrap().into_ascii_lowercase();
-                        String::from_utf8(lowercase).ok()
+                        let lowercase = v.unwrap();
+                        String::from_utf8(lowercase).ok().map(|s| s.to_uppercase())
                     }))
 }
 
@@ -69,7 +68,7 @@ fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item = String>> {
                                 _ => true,
                             })
                            .filter(|word| !word.is_empty())
-                           .map(|word| word.to_string().into_ascii_lowercase())
+                           .map(|word| word.to_string().to_uppercase())
                            .collect::<Vec<_>>()
                            .into_iter()
                    }))
@@ -122,7 +121,7 @@ fn create_model(path: &Path) {
 
 fn main() {
     let path = Path::new("/home/jamougha/corpus/pg/model.data");
-    // create_model(&path);
+    create_model(&path);
     let start_time = time::get_time();
     let builder = LanguageModelBuilder::load(&path);
     let model = builder.build();
