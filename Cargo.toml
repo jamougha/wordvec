@@ -4,4 +4,7 @@ version = "0.0.1"
 authors = ["James Moughan <jamougha@gmail.com>"]
 
 [dependencies]
+yaml-rust = { git = "https://github.com/chyh1990/yaml-rust.git" }
 time = "0.1.25"
+clap = "1.5.3"
+

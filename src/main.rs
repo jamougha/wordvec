@@ -1,10 +1,15 @@
  #![feature(std_misc)]
+ #[macro_use]
+ #[macro_use]
+extern crate clap;
+extern crate yaml_rust;
 extern crate time;
 
 mod models;
 mod parser;
 mod mayberef;
 
+use clap::{Arg, App};
 use std::fs::{File, read_dir};
 use std::io::{BufReader, BufRead, Read, Write, stdin};
 use std::path::{Path};
@@ -19,16 +24,12 @@ fn get_line() -> String {
     buffer
 }
 
-fn find_most_common_words(corpus_loc: &str, outfile: &str) {
-    let path = Path::new(corpus_loc);
-    let mut word_counts = HashMap::new();
-    let words = files(path).flat_map(|file| read_words(file));
+fn find_most_common_words(corpus: &Path, outfile: &str) {
+    let words = files(corpus).flat_map(|file| read_words(file));
 
+    let mut word_counts = HashMap::new();
     for word in words {
-        match word_counts.entry(word) {
-            Vacant(e) => { e.insert(1); },
-            Occupied(mut e) => { *e.get_mut() += 1; },
-        }
+        *word_counts.entry(word).or_insert(0) += 1;
     }
 
     let mut counts: Vec<_> = word_counts.into_iter().collect();
@@ -55,7 +56,7 @@ fn sentences<T: Read + 'static>(reader: BufReader<T>) -> Box<Iterator<Item = Str
     Box::new(reader.split('.' as u8)
                    .filter_map(|v| {
                         let lowercase = v.unwrap();
-                        String::from_utf8(lowercase).ok().map(|s| s.to_uppercase())
+                        String::from_utf8(lowercase).ok().map(|s| s.to_lowercase())
                     }))
 }
 
@@ -68,7 +69,7 @@ fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item = String>> {
                                 _ => true,
                             })
                            .filter(|word| !word.is_empty())
-                           .map(|word| word.to_string().to_uppercase())
+                           .map(|word| word.to_lowercase())
                            .collect::<Vec<_>>()
                            .into_iter()
                    }))
@@ -85,19 +86,16 @@ fn files(path: &Path) -> Box<Iterator<Item = BufReader<File>>> {
             }))
 }
 
-fn create_model(path: &Path) {
-    const CORPUS_DIR: &'static str = "/home/jamougha/corpus/pg";
-    const WORDS: &'static str = "/home/jamougha/corpus/pg/word_counts.csv";
+fn create_model(corpus: &Path, model: &Path) -> LanguageModelBuilder {
+    const WORDS: &'static str = "word_counts.csv";
     let start_time = time::get_time();
-    // find_most_common_words(CORPUS_DIR, WORDS);
+    find_most_common_words(corpus, WORDS);
     let words = load_most_common_words(WORDS, 30000);
     let mut builder = LanguageModelBuilder::new(10, words);
 
-    let corpus_path = Path::new(CORPUS_DIR);
-
     let mut num_words = 0;
 
-    for sentence in files(corpus_path).flat_map(sentences) {
+    for sentence in files(corpus).flat_map(sentences) {
         let mut acc = builder.new_sentence();
         for word in sentence.split(|c| match c {
             'a'...'z' => false,
@@ -114,18 +112,50 @@ fn create_model(path: &Path) {
         }
     }
 
-    builder.save(path);
+    builder.save(model);
     let end_time = time::get_time();
     println!("Model built in {}s", end_time.sec - start_time.sec);
+    builder
 }
 
 fn main() {
-    let path = Path::new("/home/jamougha/corpus/pg/model.data");
-    create_model(&path);
+    let matches = App::new("gauntlet")
+        .version("0.0.1")
+        .author("James Moughan <jamougha@gmail.com>")
+        .about("Implementation of GloVe algorithm")
+        .arg(Arg::with_name("CORPUS")
+            .short("c")
+            .long("corpus")
+            .help("Sets a directory to search for the corpus")
+            .takes_value(true))
+        .arg(Arg::with_name("LOAD")
+            .short("l")
+            .long("load")
+            .help("Loads a pre-saved language model")
+            .takes_value(true))
+        .arg(Arg::with_name("SAVE")
+            .short("s")
+            .long("save")
+            .help("Generates a model from the corpus specified and saves it")
+            .takes_value(true))
+        .get_matches();
+
+    let (load, save, corpus) = (matches.value_of("LOAD"), matches.value_of("SAVE"), matches.value_of("CORPUS"));
+    let builder = match (load, save, corpus) {
+        (Some(ref l), None, None) => LanguageModelBuilder::load(Path::new(&*l)),
+        (Some(_), _, _) => { println!("You must specify either a model to load or a corpus directory location"); return; }
+        (_, Some(ref s), Some(ref c)) => {
+            let corpus = Path::new(c);
+            let model = Path::new(s);
+            create_model(&corpus, &model)
+        }
+        (_, _, Some(ref c)) => panic!("Couldn't find {:?}", c),
+        _ => panic!("what")
+    };
+
     let start_time = time::get_time();
-    let builder = LanguageModelBuilder::load(&path);
     let model = builder.build();
-    println!("Model loaded in {}s", time::get_time().sec - start_time.sec);
+    println!("Model built in {}s", time::get_time().sec - start_time.sec);
 
     loop {
         println!("");
