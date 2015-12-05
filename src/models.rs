@@ -2,12 +2,14 @@ use std::ops::{Add, Sub, Div};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::iter::repeat;
-use std::fmt::{Debug, Formatter, Error};
+use std::fmt::{Debug, Formatter};
+use std::fmt;
 use std::cmp::Ordering::Equal;
 use std::ops::Drop;
 use std::cmp;
 use std::path::Path;
 use std::io::{BufWriter, Write, BufReader, Read, BufRead};
+use std::io;
 use std::fs::File;
 use std::mem;
 
@@ -24,7 +26,7 @@ impl PartialEq for WordVec {
 }
 
 impl Debug for WordVec {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
         try!(self.word.fmt(fmt));
         try!(fmt.write_str(": "));
         try!(fmt.write_str(", "));
@@ -182,29 +184,29 @@ impl LanguageModelBuilder {
         }
     }
 
-    pub fn save(&self, path: &Path) {
+    pub fn save(&self, path: &Path) -> io::Result<()> {
         let mut file = BufWriter::new(File::create(path).unwrap());
 
-        write_raw(self.word_vecs.len(), &mut file);
-        file.write(&[b'\n']).unwrap();
+        try!(write_raw(self.word_vecs.len(), &mut file));
+        try!(file.write(&[b'\n']));
 
         for vec in &self.word_vecs {
-            file.write(vec.word.as_bytes()).unwrap();
-            file.write(&[b':']).unwrap();
+            try!(file.write(vec.word.as_bytes()));
+            try!(file.write(&[b':']));
             for f in &vec.vec {
-                write_raw(*f, &mut file)
+                try!(write_raw(*f, &mut file));
             }
-            file.write(&[b'\n']).unwrap();
+            try!(file.write(&[b'\n']));
         }
-
+        Ok(())
     }
 
-    pub fn load(path: &Path) -> LanguageModelBuilder {
+    pub fn load(path: &Path) -> io::Result<LanguageModelBuilder> {
         let mut file = BufReader::new(File::open(path).unwrap());
         let mut word_vecs = Vec::new();
 
-        let size: u64 = unsafe { read_raw::<u64, _>(&mut file) };
-        read_byte(b'\n', &mut file);
+        let size: u64 = unsafe { try!(read_raw::<u64, _>(&mut file)) };
+        try!(read_byte(b'\n', &mut file));
 
         for _ in 0..size {
             let mut word: Vec<u8> = Vec::new();
@@ -215,11 +217,11 @@ impl LanguageModelBuilder {
             let mut vec: Vec<f32> = repeat(0f32).take(size as usize).collect();
             for f in &mut vec {
                 unsafe {
-                    *f = read_raw::<f32, _>(&mut file);
+                    *f = try!(read_raw::<f32, _>(&mut file));
                 }
             }
 
-            read_byte(b'\n', &mut file);
+            try!(read_byte(b'\n', &mut file));
 
             word_vecs.push(WordVec {
                 word: word,
@@ -233,12 +235,12 @@ impl LanguageModelBuilder {
                                             .map(|(i, w)| (w, i))
                                             .collect();
 
-        LanguageModelBuilder {
+        Ok(LanguageModelBuilder {
             window_radius: 0,
             words: words,
             word_vecs: word_vecs,
             sentence: Vec::new(),
-        }
+        })
     }
 }
 
@@ -298,29 +300,30 @@ impl LanguageModel {
 
 }
 
-fn read_byte<R: Read>(b: u8, read: &mut R) {
+fn read_byte<R: Read>(b: u8, read: &mut R) -> io::Result<()> {
     let buf = &mut [0];
-    while read.read(buf).unwrap() == 0 {}
+    while try!(read.read(buf)) == 0 {}
     assert_eq!(&[b], buf);
+    Ok(())
 }
 
-unsafe fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> T {
+unsafe fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> io::Result<T> {
     let mut buffer = [0u8; 64];
     let t_size = mem::size_of::<T>();
     assert!(t_size <= buffer.len());
 
     let mut remainder = t_size;
     while remainder > 0 {
-        let bytes_read = reader.read(&mut buffer[(t_size-remainder)..t_size]).unwrap();
+        let bytes_read = try!(reader.read(&mut buffer[(t_size-remainder)..t_size]));
         remainder -= bytes_read;
     }
 
     let bptr: *mut T = mem::transmute(buffer.as_ptr());
-    *bptr
+    Ok(*bptr)
 }
 
-fn write_raw<T: Copy, F: Write>(t: T, writer: &mut BufWriter<F>) {
-    let mut buffer = [0u8; 64];
+fn write_raw<T: Copy, F: Write>(t: T, writer: &mut BufWriter<F>) -> io::Result<usize> {
+    let buffer = [0u8; 64];
     let t_size = mem::size_of::<T>();
     assert!(t_size <= buffer.len());
     unsafe {
@@ -328,12 +331,16 @@ fn write_raw<T: Copy, F: Write>(t: T, writer: &mut BufWriter<F>) {
         *bptr = t;
     }
 
-    writer.write(&buffer[0..t_size]);
+    let mut start = 0;
+    while start != t_size {
+        start += try!(writer.write(&buffer[start..t_size]));
+    }
+    Ok((start))
 }
 
 #[cfg(test)]
 mod test {
-    use super::{WordVec, LanguageModel, LanguageModelBuilder};
+    use super::LanguageModelBuilder;
     use std::path::Path;
 
     fn get_builder() -> LanguageModelBuilder {
@@ -368,9 +375,9 @@ mod test {
     fn test_serialization() {
         let builder = get_builder();
         let path = Path::new("/tmp/model.data");
-        builder.save(&path);
+        builder.save(&path).unwrap();
 
-        let loaded_model = LanguageModelBuilder::load(path).build();
+        let loaded_model = LanguageModelBuilder::load(path).unwrap().build();
         assert_eq!(builder.build(), loaded_model);
     }
 }

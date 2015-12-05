@@ -11,20 +11,19 @@ mod mayberef;
 
 use clap::{Arg, App};
 use std::fs::{File, read_dir};
-use std::io::{BufReader, BufRead, Read, Write, stdin};
+use std::io::{BufReader, BufRead, Read, stdin};
 use std::path::{Path};
 use std::collections::HashMap;
-use std::collections::hash_map::Entry::*;
 use models::*;
 
 fn get_line() -> String {
-    let mut stdin = stdin();
+    let stdin = stdin();
     let mut buffer = String::new();
     stdin.read_line(&mut buffer).unwrap();
     buffer
 }
 
-fn find_most_common_words(corpus: &Path, outfile: &str) {
+fn find_most_common_words(corpus: &Path) -> Vec<String> {
     let words = files(corpus).flat_map(|file| read_words(file));
 
     let mut word_counts = HashMap::new();
@@ -35,11 +34,12 @@ fn find_most_common_words(corpus: &Path, outfile: &str) {
     let mut counts: Vec<_> = word_counts.into_iter().collect();
     counts.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let mut out = File::create(&Path::new(outfile)).unwrap();
-    for (word, count) in counts {
-        out.write_all(format!("{}, {}\n", word, count).as_bytes()).unwrap();
-    }
+    // let mut out = File::create(&Path::new(outfile)).unwrap();
+    // for &(ref word, count) in &counts {
+    //     out.write_all(format!("{}, {}\n", &word, count).as_bytes()).unwrap();
+    // }
 
+    counts.into_iter().map(|x| x.0).collect()
 }
 
 fn load_most_common_words(filename: &str, num: usize) -> Vec<String> {
@@ -86,11 +86,8 @@ fn files(path: &Path) -> Box<Iterator<Item = BufReader<File>>> {
             }))
 }
 
-fn create_model(corpus: &Path, model: &Path) -> LanguageModelBuilder {
-    const WORDS: &'static str = "word_counts.csv";
+fn create_model(corpus: &Path, words: Vec<String>) -> LanguageModelBuilder {
     let start_time = time::get_time();
-    find_most_common_words(corpus, WORDS);
-    let words = load_most_common_words(WORDS, 30000);
     let mut builder = LanguageModelBuilder::new(10, words);
 
     let mut num_words = 0;
@@ -112,7 +109,6 @@ fn create_model(corpus: &Path, model: &Path) -> LanguageModelBuilder {
         }
     }
 
-    builder.save(model);
     let end_time = time::get_time();
     println!("Model built in {}s", end_time.sec - start_time.sec);
     builder
@@ -142,15 +138,20 @@ fn main() {
 
     let (load, save, corpus) = (matches.value_of("LOAD"), matches.value_of("SAVE"), matches.value_of("CORPUS"));
     let builder = match (load, save, corpus) {
-        (Some(ref l), None, None) => LanguageModelBuilder::load(Path::new(&*l)),
+        (Some(l), None, None) => LanguageModelBuilder::load(Path::new(&l)).expect("Couldn't load model"),
         (Some(_), _, _) => { println!("You must specify either a model to load or a corpus directory location"); return; }
-        (_, Some(ref s), Some(ref c)) => {
-            let corpus = Path::new(c);
-            let model = Path::new(s);
-            create_model(&corpus, &model)
+        (_, save, Some(corpus)) => {
+            let corpus = Path::new(corpus);
+            let words = find_most_common_words(corpus);
+            let builder = create_model(&corpus, words);
+            if let Some(save) = save {
+                if let Err(e) = builder.save(Path::new(save)) {
+                    println!("Couldn't save model: {}", e);
+                }
+            }
+            builder
         }
-        (_, _, Some(ref c)) => panic!("Couldn't find {:?}", c),
-        _ => panic!("what")
+        _ => panic!("what you want?")
     };
 
     let start_time = time::get_time();

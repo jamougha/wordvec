@@ -15,7 +15,7 @@ enum Token {
     Minus,
     Divide,
     Word(String),
-    Invalid(char),
+    Invalid(String),
     Number(i32),
 }
 
@@ -41,19 +41,18 @@ impl Display for Token {
             Word(ref w) => &*w,
             Number(i) => {
                 string = format!("{}", i);
-                &*string
+                &string
             }
-            Invalid(w) => {
-                string = w.to_string();
-                &*string
+            Invalid(ref w) => {
+                &w
             },
         })
     }
 }
 
 fn get_word<'a>(model: &'a LanguageModel, word: &str) -> Result<&'a WordVec, String> {
-    model.get(&*word).ok_or_else(||
-        format!("'{}' is not present in the language model", &word)
+    model.get(word).ok_or_else(||
+        format!("'{}' is not present in the language model", word)
     )
 }
 
@@ -110,7 +109,7 @@ fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
             }
         }
         Word(word) =>  {
-            let vec = try!(get_word(model, &*word));
+            let vec = try!(get_word(model, &word));
             Ref(vec)
         }
         _ => return Err(format!("Invalid token {}", token)),
@@ -165,7 +164,7 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
             '(' => LParen,
             ')' => RParen,
             '/' => Divide,
-            c => Invalid(c),
+            c => Invalid(c.to_string()),
         })
     }
 
@@ -209,7 +208,11 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
             token.push(self.take().unwrap());
         }
 
-        Number(token.parse().unwrap())
+        if let Ok(num) = token.parse() {
+            Number(num)
+        } else {
+            Invalid(token)
+        }
     }
 
 }
