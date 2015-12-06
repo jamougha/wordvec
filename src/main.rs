@@ -14,6 +14,8 @@ use std::io::{BufReader, BufRead, Read, Write, stdin};
 use std::io;
 use std::path::{Path};
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
 use models::*;
 
 fn get_line() -> String {
@@ -45,14 +47,41 @@ fn save_words(path: &Path, words: &Vec<(String, u32)>) -> io::Result<()> {
     Ok(())
 }
 
-fn load_most_common_words(filename: &str, num: usize) -> Vec<String> {
-    let file = File::open(&Path::new(filename)).unwrap();
+#[derive(Debug)]
+struct FormatError;
+impl fmt::Display for FormatError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Invalid format for vocabulary file")
+    }
+}
+
+impl Error for FormatError {
+    fn description(&self) -> &str {
+        "The format of the vocabulary file was Invalid"
+    }
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
+}
+
+fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String, u32)>, Box<Error>> {
+    let file = try!(File::open(&Path::new(filename)));
     let reader = BufReader::new(file);
-    reader.lines().filter_map(|line|
-        line.ok().and_then(|l| l.split(',').next().map(|s| s.to_string()))
-    )
-    .take(num)
-    .collect()
+    let mut words = vec!();
+    for line in reader.lines().take(num) {
+        if let Ok(line) = line {
+            let mut columns = line.split(',');
+            let word = columns.next().map(|w| w.to_string());
+            let num = columns.next().map(|n| n.parse());
+            match (word, num) {
+                (Some(word), Some(num)) => words.push((word, try!(num))),
+                _ => return Err(Box::new(FormatError)),
+            }
+        } else {
+            return Err(Box::new(FormatError));
+        }
+    }
+    Ok(words)
 }
 
 fn sentences<T: Read + 'static>(reader: BufReader<T>) -> Box<Iterator<Item = String>> {
@@ -140,7 +169,12 @@ fn main() {
         .arg(Arg::with_name("WORDS")
             .short("w")
             .long("save_words")
-            .help("Saves or the vocabulary list to the specified file")
+            .help("Saves the vocabulary list to the specified file")
+            .takes_value(true))
+        .arg(Arg::with_name("LOAD_WORDS")
+            .short("W")
+            .long("load_words")
+            .help("Loads the vocabulary list from the specified file")
             .takes_value(true))
         .arg(Arg::with_name("NUM_WORDS")
             .short("n")
@@ -155,7 +189,11 @@ fn main() {
         (Some(_), _, _) => { println!("You must specify either a model to load or a corpus directory location"); return; }
         (_, save, Some(corpus)) => {
             let corpus = Path::new(corpus);
-            let words = find_most_common_words(corpus);
+            let words = matches.value_of("LOAD_WORDS").map(|file|
+                load_most_common_words(file, 30000)
+                   .unwrap_or_else(|e| panic!("Couldn't read vocabulary file: {}", e))
+            ).unwrap_or(find_most_common_words(corpus));
+
             if let Some(wordfile) = matches.value_of("WORDS") {
                 if let Err(e) = save_words(Path::new(wordfile), &words) {
                     println!("Couldn't save vocabulary list: {}", e);
