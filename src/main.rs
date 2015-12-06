@@ -1,4 +1,3 @@
- #![feature(std_misc)]
  #[macro_use]
  #[macro_use]
 extern crate clap;
