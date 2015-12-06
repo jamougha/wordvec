@@ -10,7 +10,8 @@ mod mayberef;
 
 use clap::{Arg, App};
 use std::fs::{File, read_dir};
-use std::io::{BufReader, BufRead, Read, stdin};
+use std::io::{BufReader, BufRead, Read, Write, stdin};
+use std::io;
 use std::path::{Path};
 use std::collections::HashMap;
 use models::*;
@@ -22,7 +23,7 @@ fn get_line() -> String {
     buffer
 }
 
-fn find_most_common_words(corpus: &Path) -> Vec<String> {
+fn find_most_common_words(corpus: &Path) -> Vec<(String, u32)> {
     let words = files(corpus).flat_map(|file| read_words(file));
 
     let mut word_counts = HashMap::new();
@@ -33,19 +34,22 @@ fn find_most_common_words(corpus: &Path) -> Vec<String> {
     let mut counts: Vec<_> = word_counts.into_iter().collect();
     counts.sort_by(|a, b| b.1.cmp(&a.1));
 
-    // let mut out = File::create(&Path::new(outfile)).unwrap();
-    // for &(ref word, count) in &counts {
-    //     out.write_all(format!("{}, {}\n", &word, count).as_bytes()).unwrap();
-    // }
+    counts
+}
 
-    counts.into_iter().map(|x| x.0).collect()
+fn save_words(path: &Path, words: &Vec<(String, u32)>) -> io::Result<()> {
+    let mut out = try!(File::create(path));
+    for &(ref word, count) in words {
+        try!(out.write_all(format!("{}, {}\n", &word, count).as_bytes()));
+    }
+    Ok(())
 }
 
 fn load_most_common_words(filename: &str, num: usize) -> Vec<String> {
     let file = File::open(&Path::new(filename)).unwrap();
     let reader = BufReader::new(file);
-    reader.lines().map(|line|
-        line.unwrap().split(',').next().unwrap().to_string()
+    reader.lines().filter_map(|line|
+        line.ok().and_then(|l| l.split(',').next().map(|s| s.to_string()))
     )
     .take(num)
     .collect()
@@ -133,6 +137,16 @@ fn main() {
             .long("save")
             .help("Generates a model from the corpus specified and saves it")
             .takes_value(true))
+        .arg(Arg::with_name("WORDS")
+            .short("w")
+            .long("save_words")
+            .help("Saves or the vocabulary list to the specified file")
+            .takes_value(true))
+        .arg(Arg::with_name("NUM_WORDS")
+            .short("n")
+            .long("num_words")
+            .help("The maximum number of words to use in the vocabulary list, defaults to 30000")
+            .takes_value(true))
         .get_matches();
 
     let (load, save, corpus) = (matches.value_of("LOAD"), matches.value_of("SAVE"), matches.value_of("CORPUS"));
@@ -142,7 +156,12 @@ fn main() {
         (_, save, Some(corpus)) => {
             let corpus = Path::new(corpus);
             let words = find_most_common_words(corpus);
-            let builder = create_model(&corpus, words);
+            if let Some(wordfile) = matches.value_of("WORDS") {
+                if let Err(e) = save_words(Path::new(wordfile), &words) {
+                    println!("Couldn't save vocabulary list: {}", e);
+                }
+            }
+            let builder = create_model(&corpus, words.into_iter().map(|x| x.0).collect());
             if let Some(save) = save {
                 if let Err(e) = builder.save(Path::new(save)) {
                     println!("Couldn't save model: {}", e);
