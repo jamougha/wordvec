@@ -27,7 +27,7 @@ impl Error for FormatError {
     }
 }
 
-pub fn find_most_common_words(corpus: &Path) -> Vec<(String, u32)> {
+pub fn find_most_common_words(corpus: &Path, num: usize) -> Vec<(String, u32)> {
     let words = files(corpus).flat_map(|file| read_words(file));
 
     let mut word_counts = HashMap::new();
@@ -37,6 +37,7 @@ pub fn find_most_common_words(corpus: &Path) -> Vec<(String, u32)> {
 
     let mut counts: Vec<_> = word_counts.into_iter().collect();
     counts.sort_by(|a, b| b.1.cmp(&a.1));
+    counts.truncate(num);
 
     counts
 }
@@ -46,6 +47,7 @@ pub fn save_words(path: &Path, words: &Vec<(String, u32)>) -> io::Result<()> {
     for &(ref word, count) in words {
         try!(out.write_all(format!("{}, {}\n", &word, count).as_bytes()));
     }
+    println!("saved words");
     Ok(())
 }
 
@@ -57,7 +59,8 @@ pub fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String,
         if let Ok(line) = line {
             let mut columns = line.split(',');
             let word = columns.next().map(|w| w.to_string());
-            let num = columns.next().map(|n| n.parse());
+            let num = columns.next().map(|n| n.trim().parse());
+            println!("{:?}", num);
             match (word, num) {
                 (Some(word), Some(num)) => words.push((word, try!(num))),
                 _ => return Err(Box::new(FormatError)),
@@ -66,6 +69,7 @@ pub fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String,
             return Err(Box::new(FormatError));
         }
     }
+    println!("loaded words");
     Ok(words)
 }
 
@@ -104,8 +108,9 @@ fn files(path: &Path) -> Box<Iterator<Item = BufReader<File>>> {
 }
 
 pub fn create_model(corpus: &Path, words: Vec<String>) -> LanguageModelBuilder {
+    println!("creating model builder");
     let mut builder = LanguageModelBuilder::new(10, words);
-
+    println!("created model builder");
     for sentence in files(corpus).flat_map(sentences) {
         let mut acc = builder.new_sentence();
         for word in sentence.split(|c| match c {

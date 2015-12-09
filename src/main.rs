@@ -57,10 +57,12 @@ fn main() {
         (Some(l), None) => LanguageModelBuilder::load(Path::new(&l)).expect("Couldn't load model"),
         (None, Some(corpus)) => {
             let corpus = Path::new(corpus);
+            let num_words = matches.value_of("NUM_WORDS").map(|n|
+                n.parse().expect("Number of words was invalid")).unwrap_or(30000);
             let words = matches.value_of("LOAD_WORDS").map(|file|
-                load_most_common_words(file, 30000)
+                load_most_common_words(file, num_words)
                    .unwrap_or_else(|e| panic!("Couldn't read vocabulary file: {}", e))
-            ).unwrap_or(find_most_common_words(corpus));
+            ).unwrap_or(find_most_common_words(corpus, num_words));
 
             if let Some(wordfile) = matches.value_of("WORDS") {
                 if let Err(e) = save_words(Path::new(wordfile), &words) {
