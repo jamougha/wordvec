@@ -12,7 +12,7 @@ mod processing;
 use clap::{Arg, App};
 use std::io::{BufRead, Read, stdin};
 use std::path::{Path};
-use models::*;
+use models::LanguageModelBuilder;
 use processing::{find_most_common_words, save_words, load_most_common_words, create_model};
 
 fn main() {
@@ -52,11 +52,10 @@ fn main() {
             .takes_value(true))
         .get_matches();
 
-    let (load, save, corpus) = (matches.value_of("LOAD"), matches.value_of("SAVE"), matches.value_of("CORPUS"));
-    let builder = match (load, save, corpus) {
-        (Some(l), None, None) => LanguageModelBuilder::load(Path::new(&l)).expect("Couldn't load model"),
-        (Some(_), _, _) => { println!("You must specify either a model to load or a corpus directory location"); return; }
-        (_, save, Some(corpus)) => {
+    let (load, corpus) = (matches.value_of("LOAD"), matches.value_of("CORPUS"));
+    let builder = match (load, corpus) {
+        (Some(l), None) => LanguageModelBuilder::load(Path::new(&l)).expect("Couldn't load model"),
+        (None, Some(corpus)) => {
             let corpus = Path::new(corpus);
             let words = matches.value_of("LOAD_WORDS").map(|file|
                 load_most_common_words(file, 30000)
@@ -69,14 +68,18 @@ fn main() {
                 }
             }
             let builder = create_model(&corpus, words.into_iter().map(|x| x.0).collect());
-            if let Some(save) = save {
+            if let Some(save) = matches.value_of("SAVE") {
                 if let Err(e) = builder.save(Path::new(save)) {
                     println!("Couldn't save model: {}", e);
                 }
             }
+
             builder
         }
-        _ => panic!("what you want?")
+        _ => {
+            println!("You must specify either a model to load or a corpus directory location");
+            return;
+        }
     };
 
     let start_time = time::get_time();

@@ -1,13 +1,13 @@
 extern crate time;
 
 use std::fs::{File, read_dir};
-use std::io::{BufReader, BufRead, Read, Write, stdin};
+use std::io::{BufReader, BufRead, Read, Write};
 use std::io;
 use std::path::{Path};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use models::*;
+use models::LanguageModelBuilder;
 
 
 #[derive(Debug)]
