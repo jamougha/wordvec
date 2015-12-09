@@ -322,7 +322,7 @@ unsafe fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> io::Result<T>
     Ok(*bptr)
 }
 
-fn write_raw<T: Copy, F: Write>(t: T, writer: &mut BufWriter<F>) -> io::Result<usize> {
+fn write_raw<T: Copy, F: Write>(t: T, writer: &mut F) -> io::Result<usize> {
     let buffer = [0u8; 64];
     let t_size = mem::size_of::<T>();
     assert!(t_size <= buffer.len());
