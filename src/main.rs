@@ -63,7 +63,7 @@ fn main() {
                 load_most_common_words(file, num_words)
                    .unwrap_or_else(|e| panic!("Couldn't read vocabulary file: {}", e))
             ).unwrap_or(find_most_common_words(corpus, num_words));
-
+            panic!("foo");
             if let Some(wordfile) = matches.value_of("WORDS") {
                 if let Err(e) = save_words(Path::new(wordfile), &words) {
                     println!("Couldn't save vocabulary list: {}", e);

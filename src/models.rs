@@ -36,20 +36,6 @@ impl Debug for WordVec {
 
 impl WordVec {
 
-    fn dot_prod(&self, other: &WordVec) -> f32 {
-        self.vec.iter()
-                .zip(other.vec.iter())
-                .map(|(x, y)| x * y)
-                .fold(0.0, |x, y| x + y)
-    }
-
-    fn magnitude(&self) -> f32 {
-        self.vec.iter()
-                .map(|x| x * x)
-                .fold(0.0, |x, y| x + y)
-                .sqrt()
-    }
-
     pub fn distance(&self, other: &WordVec) -> f32 {
         self.vec.iter().zip(other.vec.iter())
                 .map(|(x, y)| (x - y)*(x - y))
@@ -64,14 +50,16 @@ impl WordVec {
         }
     }
 
-    fn normalize(&mut self) {
-        let cooccurences = self.vec.iter().fold(0f32, |x, y| {
+    fn cooccurences(&self) -> f32 {
+        self.vec.iter().fold(0.0, |x, y| {
             assert!(!y.is_nan());
             x + *y
-        });
+        })
+    }
 
+    fn normalize(&mut self) {
         for f in &mut self.vec {
-            *f /= cooccurences + 1.0;
+            *f = (*f + 1.0).log2();
         }
     }
 
