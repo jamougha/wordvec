@@ -5,12 +5,11 @@ use std::io::{BufReader, BufRead, Read, Write};
 use std::io;
 use std::path::Path;
 use std::collections::HashMap;
-use std::fmt;
 use models::LanguageModelBuilder;
 use error::Error;
 
 
-pub fn find_most_common_words(corpus: &Path, num: usize) -> Vec<(String, u32)> {
+pub fn find_most_common_words(corpus: &Path, num: usize) -> Vec<(String, u64)> {
     let words = files(corpus).flat_map(|file| read_words(file));
 
     let mut word_counts = HashMap::new();
@@ -25,7 +24,7 @@ pub fn find_most_common_words(corpus: &Path, num: usize) -> Vec<(String, u32)> {
     counts
 }
 
-pub fn save_words(path: &Path, words: &Vec<(String, u32)>) -> io::Result<()> {
+pub fn save_words(path: &Path, words: &Vec<(String, u64)>) -> io::Result<()> {
     let mut out = try!(File::create(path));
     for &(ref word, count) in words {
         try!(out.write_all(format!("{}, {}\n", &word, count).as_bytes()));
@@ -34,7 +33,7 @@ pub fn save_words(path: &Path, words: &Vec<(String, u32)>) -> io::Result<()> {
     Ok(())
 }
 
-pub fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String, u32)>, Error> {
+pub fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String, u64)>, Error> {
     let file = try!(File::open(&Path::new(filename)));
     let reader = BufReader::new(file);
     let mut words = vec![];
