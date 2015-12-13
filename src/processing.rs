@@ -5,27 +5,10 @@ use std::io::{BufReader, BufRead, Read, Write};
 use std::io;
 use std::path::Path;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fmt;
 use models::LanguageModelBuilder;
+use error::Error;
 
-
-#[derive(Debug)]
-pub struct FormatError;
-impl fmt::Display for FormatError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid format for vocabulary file")
-    }
-}
-
-impl Error for FormatError {
-    fn description(&self) -> &str {
-        "The format of the vocabulary file was Invalid"
-    }
-    fn cause(&self) -> Option<&Error> {
-        None
-    }
-}
 
 pub fn find_most_common_words(corpus: &Path, num: usize) -> Vec<(String, u32)> {
     let words = files(corpus).flat_map(|file| read_words(file));
@@ -51,9 +34,7 @@ pub fn save_words(path: &Path, words: &Vec<(String, u32)>) -> io::Result<()> {
     Ok(())
 }
 
-pub fn load_most_common_words(filename: &str,
-                              num: usize)
-                              -> Result<Vec<(String, u32)>, Box<Error>> {
+pub fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String, u32)>, Error> {
     let file = try!(File::open(&Path::new(filename)));
     let reader = BufReader::new(file);
     let mut words = vec![];
@@ -65,10 +46,10 @@ pub fn load_most_common_words(filename: &str,
 
             match (word, num) {
                 (Some(word), Some(num)) => words.push((word, try!(num))),
-                _ => return Err(Box::new(FormatError)),
+                _ => return Err(Error::FormatError),
             }
         } else {
-            return Err(Box::new(FormatError));
+            return Err(Error::FormatError);
         }
     }
 
