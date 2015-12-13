@@ -106,7 +106,7 @@ fn files(path: &Path) -> Box<Iterator<Item = BufReader<File>>> {
                  .map(|path| path.unwrap().path())
                  .filter(|path| path.to_str().unwrap().ends_with(".txt"))
                  .map(|path| {
-                     let file = File::open(&path).unwrap();
+                     let file = File::open(path).unwrap();
                      BufReader::new(file)
                  }))
 }
@@ -116,13 +116,15 @@ pub fn create_model(corpus: &Path, words: Vec<String>) -> LanguageModelBuilder {
 
     for sentence in files(corpus).take(10).flat_map(sentences) {
         let mut acc = builder.new_sentence();
-        for word in sentence.split(|c| {
+
+        let words = sentence.split(|c| {
                                 match c {
                                     'a'...'z' => false,
                                     _ => true,
                                 }
                             })
-                            .filter(|w| !w.is_empty()) {
+                            .filter(|w| !w.is_empty());
+        for word in words {
             acc.add_word(word);
         }
     }
