@@ -35,12 +35,13 @@ impl Debug for WordVec {
 }
 
 impl WordVec {
-
     pub fn distance(&self, other: &WordVec) -> f32 {
-        self.vec.iter().zip(other.vec.iter())
-                .map(|(x, y)| (x - y)*(x - y))
-                .fold(0.0, |x, y| x + y)
-                .sqrt()
+        self.vec
+            .iter()
+            .zip(other.vec.iter())
+            .map(|(x, y)| (x - y) * (x - y))
+            .fold(0.0, |x, y| x + y)
+            .sqrt()
     }
 
     fn new(word: String, num_words: usize) -> WordVec {
@@ -67,7 +68,6 @@ impl WordVec {
         assert!(dist != 0);
         self.vec[i] += 1.0 / dist as f32;
     }
-
 }
 
 impl Div<i32> for WordVec {
@@ -142,10 +142,9 @@ impl LanguageModelBuilder {
                              .map(|s| WordVec::new(s.clone(), words.len()))
                              .collect();
 
-        let words = HashMap::from_iter(
-                        words.into_iter()
-                             .enumerate()
-                             .map(|(a, b)| (b, a)));
+        let words = HashMap::from_iter(words.into_iter()
+                                            .enumerate()
+                                            .map(|(a, b)| (b, a)));
 
         LanguageModelBuilder {
             window_radius: window_radius,
@@ -167,9 +166,7 @@ impl LanguageModelBuilder {
     }
 
     pub fn new_sentence<'a>(&'a mut self) -> WordAcceptor<'a> {
-        WordAcceptor {
-            builder: self,
-        }
+        WordAcceptor { builder: self }
     }
 
     pub fn save(&self, path: &Path) -> io::Result<()> {
@@ -271,21 +268,25 @@ impl LanguageModel {
     }
 
     pub fn nearest_words(&self, word: &WordVec) -> Vec<&WordVec> {
-        let mut vec_refs = self.word_vecs.iter().filter_map(|w| {
-            let dist = w.distance(word);
-            if w.word != word.word {
-                Some((dist, w))
-            } else {
-                None
-            }
-        }).collect::<Vec<_>>();
-        vec_refs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or_else(|| {
-            println!("bad vector: {:?}, {:?}", a, b);
-            Equal
-        }));
+        let mut vec_refs = self.word_vecs
+                               .iter()
+                               .filter_map(|w| {
+                                   let dist = w.distance(word);
+                                   if w.word != word.word {
+                                       Some((dist, w))
+                                   } else {
+                                       None
+                                   }
+                               })
+                               .collect::<Vec<_>>();
+        vec_refs.sort_by(|a, b| {
+            a.0.partial_cmp(&b.0).unwrap_or_else(|| {
+                println!("bad vector: {:?}, {:?}", a, b);
+                Equal
+            })
+        });
         vec_refs.into_iter().map(|x| x.1).collect()
     }
-
 }
 
 fn read_byte<R: Read>(b: u8, read: &mut R) -> io::Result<()> {
@@ -302,7 +303,7 @@ unsafe fn read_raw<T: Copy, R: Read>(reader: &mut BufReader<R>) -> io::Result<T>
 
     let mut remainder = t_size;
     while remainder > 0 {
-        let bytes_read = try!(reader.read(&mut buffer[(t_size-remainder)..t_size]));
+        let bytes_read = try!(reader.read(&mut buffer[(t_size - remainder)..t_size]));
         remainder -= bytes_read;
     }
 

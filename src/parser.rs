@@ -43,34 +43,33 @@ impl Display for Token {
                 string = format!("{}", i);
                 &string
             }
-            Invalid(ref w) => {
-                &w
-            },
+            Invalid(ref w) => &w,
         })
     }
 }
 
 fn get_word<'a>(model: &'a LanguageModel, word: &str) -> Result<&'a WordVec, String> {
-    model.get(word).ok_or_else(||
-        format!("'{}' is not present in the language model", word)
-    )
+    model.get(word).ok_or_else(|| format!("'{}' is not present in the language model", word))
 }
 
-fn expression<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
-    -> Result<MaybeRef<'a, WordVec>, String>
+fn expression<'a, I>(tokens: &mut Tokens<I>,
+                     model: &'a LanguageModel)
+                     -> Result<MaybeRef<'a, WordVec>, String>
     where I: Iterator<Item = char>
 {
     let atom = try!(atom(tokens, model));
     match tokens.peek() {
         Some(&Plus) | Some(&Minus) => rhs(atom, tokens, model),
         None => Ok(atom),
-        _ => Err(format!("Invalid token '{:?}'", tokens.peek().unwrap()))
+        _ => Err(format!("Invalid token '{:?}'", tokens.peek().unwrap())),
     }
 }
 
 
-fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &LanguageModel)
-    -> Result<MaybeRef<'a, WordVec>, String>
+fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>,
+              tokens: &mut Tokens<I>,
+              model: &LanguageModel)
+              -> Result<MaybeRef<'a, WordVec>, String>
     where I: Iterator<Item = char>
 {
     match tokens.peek() {
@@ -93,8 +92,9 @@ fn rhs<'a, I>(lhs: MaybeRef<'a, WordVec>, tokens: &mut Tokens<I>, model: &Langua
     }
 }
 
-fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
-    -> Result<MaybeRef<'a, WordVec>, String>
+fn atom<'a, I>(tokens: &mut Tokens<I>,
+               model: &'a LanguageModel)
+               -> Result<MaybeRef<'a, WordVec>, String>
     where I: Iterator<Item = char>
 {
     let token = try!(tokens.next().ok_or("Invalid end of expression"));
@@ -108,7 +108,7 @@ fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
                 None => return Err("Unclosed parentheses".to_string()),
             }
         }
-        Word(word) =>  {
+        Word(word) => {
             let vec = try!(get_word(model, &word));
             Ref(vec)
         }
@@ -121,8 +121,7 @@ fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
 
     tokens.next();
 
-    let num = try!(tokens.next().ok_or(
-        "An expression may not end with a division operator"));
+    let num = try!(tokens.next().ok_or("An expression may not end with a division operator"));
 
     match num {
         Number(num) => Ok(Val(atom.take() / num)),
@@ -134,10 +133,11 @@ fn atom<'a, I>(tokens: &mut Tokens<I>, model: &'a LanguageModel)
 struct Tokens<I> {
     iter: I,
     next_char: Option<Option<char>>,
-    next_token: Option<Option<Token>>
+    next_token: Option<Option<Token>>,
 }
 
-impl<I> Tokens<I> where I: Iterator<Item = char> {
+impl<I> Tokens<I> where I: Iterator<Item = char>
+{
     fn from(iter: I) -> Tokens<I> {
         Tokens {
             iter: iter,
@@ -214,10 +214,10 @@ impl<I> Tokens<I> where I: Iterator<Item = char> {
             Invalid(token)
         }
     }
-
 }
 
-impl<I> Iterator for Tokens<I> where I: Iterator<Item = char> {
+impl<I> Iterator for Tokens<I> where I: Iterator<Item = char>
+{
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
@@ -254,18 +254,25 @@ mod test {
     #[test]
     fn plus_tokens() {
         let s = Tokens::from("   abc  +def".chars()).collect::<Vec<_>>();
-        assert_eq!(s, vec![Word("abc".to_string()), Plus, Word("def".to_string())]);
+        assert_eq!(s,
+                   vec![Word("abc".to_string()), Plus, Word("def".to_string())]);
     }
 
     #[test]
     fn bracket_tokens() {
         let s = Tokens::from(" ()  (abc  +)def".chars()).collect::<Vec<_>>();
-        assert_eq!(s, vec![LParen, RParen, LParen, Word("abc".to_string()),
-            Plus, RParen, Word("def".to_string())]);
+        assert_eq!(s,
+                   vec![LParen,
+                        RParen,
+                        LParen,
+                        Word("abc".to_string()),
+                        Plus,
+                        RParen,
+                        Word("def".to_string())]);
     }
 
     fn get_model() -> LanguageModel {
-        let words = vec!("a".to_string(), "b".to_string(), "c".to_string());
+        let words = vec!["a".to_string(), "b".to_string(), "c".to_string()];
         let mut builder = LanguageModelBuilder::new(1, words);
 
         {
@@ -282,9 +289,12 @@ mod test {
     #[test]
     fn test_addition() {
         let model = get_model();
-        assert_eq!(parse("a - b + c", &model).unwrap(), parse("(a - b) + c", &model).unwrap());
-        assert_eq!(parse("a + (b - c)", &model).unwrap(), parse("(a + b) - c", &model).unwrap());
-        assert_eq!(parse("a + b - c)", &model).unwrap(), parse("a - c + b", &model).unwrap());
+        assert_eq!(parse("a - b + c", &model).unwrap(),
+                   parse("(a - b) + c", &model).unwrap());
+        assert_eq!(parse("a + (b - c)", &model).unwrap(),
+                   parse("(a + b) - c", &model).unwrap());
+        assert_eq!(parse("a + b - c)", &model).unwrap(),
+                   parse("a - c + b", &model).unwrap());
         assert!(parse("a + b", &model) != parse("a - b", &model));
     }
 

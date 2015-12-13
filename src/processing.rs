@@ -3,7 +3,7 @@ extern crate time;
 use std::fs::{File, read_dir};
 use std::io::{BufReader, BufRead, Read, Write};
 use std::io;
-use std::path::{Path};
+use std::path::Path;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -51,10 +51,12 @@ pub fn save_words(path: &Path, words: &Vec<(String, u32)>) -> io::Result<()> {
     Ok(())
 }
 
-pub fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String, u32)>, Box<Error>> {
+pub fn load_most_common_words(filename: &str,
+                              num: usize)
+                              -> Result<Vec<(String, u32)>, Box<Error>> {
     let file = try!(File::open(&Path::new(filename)));
     let reader = BufReader::new(file);
-    let mut words = vec!();
+    let mut words = vec![];
     for line in reader.lines().take(num) {
         if let Ok(line) = line {
             let mut columns = line.split(',');
@@ -76,19 +78,21 @@ pub fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String,
 fn sentences<T: Read + 'static>(reader: BufReader<T>) -> Box<Iterator<Item = String>> {
     Box::new(reader.split('.' as u8)
                    .filter_map(|v| {
-                        let lowercase = v.unwrap();
-                        String::from_utf8(lowercase).ok().map(|s| s.to_lowercase())
-                    }))
+                       let lowercase = v.unwrap();
+                       String::from_utf8(lowercase).ok().map(|s| s.to_lowercase())
+                   }))
 }
 
 fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item = String>> {
     Box::new(reader.lines()
                    .filter_map(|line| line.ok())
                    .flat_map(|line| {
-                       line.split(|c| match c {
-                                'a'...'z' | 'A'...'Z' => false,
-                                _ => true,
-                            })
+                       line.split(|c| {
+                               match c {
+                                   'a'...'z' | 'A'...'Z' => false,
+                                   _ => true,
+                               }
+                           })
                            .filter(|word| !word.is_empty())
                            .map(|word| word.to_lowercase())
                            .collect::<Vec<_>>()
@@ -98,13 +102,13 @@ fn read_words<R: BufRead + 'static>(reader: R) -> Box<Iterator<Item = String>> {
 
 fn files(path: &Path) -> Box<Iterator<Item = BufReader<File>>> {
     Box::new(read_dir(path)
-            .unwrap()
-            .map(|path| path.unwrap().path())
-            .filter(|path| path.to_str().unwrap().ends_with(".txt"))
-            .map(|path| {
-                let file = File::open(&path).unwrap();
-                BufReader::new(file)
-            }))
+                 .unwrap()
+                 .map(|path| path.unwrap().path())
+                 .filter(|path| path.to_str().unwrap().ends_with(".txt"))
+                 .map(|path| {
+                     let file = File::open(&path).unwrap();
+                     BufReader::new(file)
+                 }))
 }
 
 pub fn create_model(corpus: &Path, words: Vec<String>) -> LanguageModelBuilder {
@@ -112,11 +116,13 @@ pub fn create_model(corpus: &Path, words: Vec<String>) -> LanguageModelBuilder {
 
     for sentence in files(corpus).take(10).flat_map(sentences) {
         let mut acc = builder.new_sentence();
-        for word in sentence.split(|c| match c {
-            'a'...'z' => false,
-            _ => true,
-        }).filter(|w| !w.is_empty())
-        {
+        for word in sentence.split(|c| {
+                                match c {
+                                    'a'...'z' => false,
+                                    _ => true,
+                                }
+                            })
+                            .filter(|w| !w.is_empty()) {
             acc.add_word(word);
         }
     }
