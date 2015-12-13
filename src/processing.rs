@@ -114,7 +114,7 @@ fn files(path: &Path) -> Box<Iterator<Item = BufReader<File>>> {
 pub fn create_model(corpus: &Path, words: Vec<String>) -> LanguageModelBuilder {
     let mut builder = LanguageModelBuilder::new(10, words);
 
-    for sentence in files(corpus).take(10).flat_map(sentences) {
+    for sentence in files(corpus).flat_map(sentences) {
         let mut acc = builder.new_sentence();
 
         let words = sentence.split(|c| {
