@@ -51,6 +51,7 @@ impl WordVec {
         }
     }
 
+    #[allow(dead_code)]
     fn cooccurences(&self) -> f32 {
         self.vec.iter().fold(0.0, |x, y| {
             assert!(!y.is_nan());
