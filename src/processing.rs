@@ -11,14 +11,13 @@ use error::Error;
 
 pub fn find_most_common_words(corpus: &Path, num: usize) -> Vec<(String, u64)> {
     let words = files(corpus).flat_map(|file| read_words(file));
-
     let mut word_counts = HashMap::new();
     for word in words {
         *word_counts.entry(word).or_insert(0) += 1;
     }
 
     let mut counts: Vec<_> = word_counts.into_iter().collect();
-    counts.sort_by(|a, b| b.1.cmp(&a.1));
+    counts.sort_by(|a, b| b.1.cmp(&a.1)); 
     counts.truncate(num);
 
     counts
@@ -27,14 +26,13 @@ pub fn find_most_common_words(corpus: &Path, num: usize) -> Vec<(String, u64)> {
 pub fn save_words(path: &Path, words: &Vec<(String, u64)>) -> io::Result<()> {
     let mut out = try!(File::create(path));
     for &(ref word, count) in words {
-        try!(out.write_all(format!("{}, {}\n", &word, count).as_bytes()));
+        try!(out.write_all(format!("{}, {}\n", word, count).as_bytes()));
     }
 
     Ok(())
 }
 
-pub fn load_most_common_words(filename: &str, num: usize) -> Result<Vec<(String, u64)>, Error> {
-    let file = try!(File::open(&Path::new(filename)));
+pub fn load_most_common_words<R: Read>(file: R, num: usize) -> Result<Vec<(String, u64)>, Error> {
     let reader = BufReader::new(file);
     let mut words = vec![];
     for line in reader.lines().take(num) {

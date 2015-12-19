@@ -1,5 +1,3 @@
-
-#[macro_use]
 #[macro_use]
 extern crate clap;
 extern crate time;
@@ -13,6 +11,7 @@ mod error;
 
 use clap::{Arg, App};
 use std::io::{BufRead, Read, stdin};
+use std::fs;
 use std::path::Path;
 use models::LanguageModelBuilder;
 use processing::{find_most_common_words, save_words, load_most_common_words, create_model};
@@ -63,13 +62,19 @@ fn main() {
             let num_words = matches.value_of("NUM_WORDS")
                                    .map(|n| n.parse().expect("Number of words was invalid"))
                                    .unwrap_or(30000);
-            let words = matches.value_of("LOAD_WORDS")
-                               .map(|file| {
-                                   load_most_common_words(file, num_words).unwrap_or_else(|e| {
-                                       panic!("Couldn't read vocabulary file: {}", e)
-                                   })
-                               })
-                               .unwrap_or(find_most_common_words(corpus, num_words));
+
+            let words = match matches.value_of("LOAD_WORDS") {
+                None => find_most_common_words(corpus, num_words),
+                Some(file) => {
+                    fs::File::open(file)
+                        .map_err(|e| From::from(e))
+                        .and_then(|f| load_most_common_words(f, num_words))
+                        .unwrap_or_else(|e| {
+                            panic!("Error loading most vocabulary list: {}", e);
+                        })
+                }
+            };
+
             if let Some(wordfile) = matches.value_of("WORDS") {
                 if let Err(e) = save_words(Path::new(wordfile), &words) {
                     println!("Couldn't save vocabulary list: {}", e);
