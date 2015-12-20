@@ -1,6 +1,6 @@
-#[macro_use]
 extern crate clap;
 extern crate time;
+extern crate rand;
 
 mod models;
 mod parser;

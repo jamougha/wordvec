@@ -1,3 +1,4 @@
+use models::linalg::Matrix;
 use std::ops::{Add, Sub, Div};
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -165,6 +166,8 @@ impl LanguageModelBuilder {
             vec.normalize();
         }
 
+        solve(&mut self, 200);
+
         LanguageModel {
             words: self.words,
             word_vecs: self.word_vecs,
@@ -235,16 +238,6 @@ impl LanguageModelBuilder {
     }
 }
 
-impl IndexableModel for LanguageModelBuilder {
-    fn get(&self, i: usize) -> &WordVec {
-        &self.word_vecs[i]
-    }
-
-    fn size(&self) -> usize {
-        self.word_vecs.len()
-    }
-}
-
 impl<'a> WordAcceptor<'a> {
     pub fn add_word(&mut self, word: &str) {
         let idx_opt = self.builder.words.get(word).map(|w| *w);
@@ -275,6 +268,39 @@ impl<'a> Drop for WordAcceptor<'a> {
         }
 
         sentence.clear();
+    }
+}
+
+const ALPHA: f32 = 0.0002;
+
+pub fn solve(lmb: &mut LanguageModelBuilder, k: usize) {
+    let mut p = Matrix::random(lmb.word_vecs.len(), k, 0.0, 3.);
+    let mut q = Matrix::random(lmb.word_vecs.len(), k, 0.0, 3.);
+
+    for _ in 0..100 {
+        step(&mut p, &mut q, lmb);
+    }
+
+    let len = lmb.word_vecs.len();
+    for i in 0..len {
+        for j in 0..len {
+            lmb.word_vecs[i].vec[j] = &p[i] * &q[j];
+        }
+    }
+}
+
+fn step(p: &mut Matrix, q: &mut Matrix, lmb: &LanguageModelBuilder) {
+    let len = lmb.word_vecs.len();
+    for i in 0..len {
+        for j in 0..len {
+            let eij = lmb.word_vecs[i].vec[j] - &p[i] * &q[j];
+            for k in 0..q[i].len() {
+                let delta_p = ALPHA * eij * q[i][k];
+                let delta_q = ALPHA * eij * p[j][k];
+                p[i][k] += delta_p;
+                q[j][k] += delta_q;
+            }
+        }
     }
 }
 
